@@ -2,19 +2,6 @@ library(fs)
 library(tidyverse)
 library(lubridate)
 
-
-
-
-# doubling times ================================================================== 
-
-calc_doubling <- function(x, n = 7){
-  # n is number of points to count over
-  dbl <- n * log(2) / log(x / replace_na(lag(x, n), 0))
-  # zero doubling shouldn't exist
-  ifelse(dbl == 0, NA, dbl)
-}
-
-
 # Import Scottish Data ============================================================
 
 cov_scotdata <- function(){
@@ -25,8 +12,6 @@ cov_scotdata <- function(){
   WATTY62REGIONALCASES <- "regional_cases.csv"
   WATTY62DEATHS <- "regional_deaths.csv"
   WATTY62TESTS <- "scot_tests.csv"
-  
-  source("utils.R")
   
   # Import Scottish Case Data ----------------------------------------------------
   

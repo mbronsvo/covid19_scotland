@@ -37,12 +37,6 @@ cov_scotdata <- function(){
   scot_deaths_raw  <- read_csv(file = paste0(WATTY62PATH, WATTY62DEATHS),
                           na = "x")
   
-  scot_deaths_raw <- scot_deaths_raw %>%
-    mutate(Date = case_when(
-      Date == "10-Apr-2020" & lag(.$Date) == "31-Mar-2020" ~ "1-Apr-2020",
-      TRUE ~ Date
-    ))
-  
   scot_deaths <- scot_deaths_raw %>% 
     mutate(date = dmy(Date)) %>%
     select(-Date) %>%
@@ -94,3 +88,31 @@ cov_scotdata <- function(){
 }
 
 
+
+cov_scothospdata <- function(){
+  ## Covid daily hospital data
+  myurl <- "https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/04/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/documents/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/govscot%3Adocument/Data%2BTable%2B%252810-04-2020%2529.xlsx?forceDownload=true"
+  
+  GET(myurl, write_disk(tmp <- tempfile(fileext = ".xlsx")))
+  scot_hosp <- read_excel(tmp, sheet = "Table 1", skip = 3)
+  file.remove(tmp)
+  
+  scot_hosp <- scot_hosp %>%
+    rename("date" = "...1",
+           "icu_confirmed" = "Confirmed...2",
+           "icu_suspected" ="Suspected...3", 
+           "icu_total" = "Total...4",
+           "hosp_confirmed" = "Confirmed...5",
+           "hosp_suspected" = "Suspected...6",
+           "hosp_total" = "Total...7" ) %>%
+    filter(!is.na(hosp_total)) %>%
+    mutate(date = excel_numeric_to_date(as.numeric(date))) %>% 
+    mutate(icu_confsusp = case_when(is.na(icu_confirmed) & is.na(icu_suspected) ~ icu_total)) %>%
+    mutate(hosp_confsusp = case_when(is.na(hosp_confirmed) & is.na(hosp_suspected) ~ hosp_total)) %>% 
+    pivot_longer(icu_confirmed:hosp_confsusp, names_to = "key", values_to = "number") %>% 
+    separate(key, into = c("location", "class"), sep = "_") %>% 
+    mutate(class = fct_recode(class, "Confirmed/Suspected" = "confsusp"),
+           class = str_to_title(class))
+  
+  scot_hosp
+}

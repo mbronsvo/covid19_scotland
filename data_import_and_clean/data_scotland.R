@@ -77,4 +77,20 @@ cov_scotdata <- function(){
   scot_data %>% 
     left_join(scot_pop, by = "health_board")
   
+  # Add testing ------------------------------------------------------------------
+  
+  scot_tests <- read_csv(file = paste0(WATTY62PATH,WATTY62TESTS)) %>% 
+    clean_names() %>%
+    mutate(date = dmy(date)) %>% 
+    rename(tests_total = total,
+           tests_today = conducted) %>% 
+    mutate(health_board = "Grand Total")
+  
+  scot_data <- scot_data %>% 
+    left_join(scot_tests, by = c("date", "health_board"))
+  
+  scot_data
+  
 }
+
+

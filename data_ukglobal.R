@@ -1,6 +1,6 @@
-# READ data from various github places
+# READ data from various github places -----------------------------------------
 
-# GLOBAL data
+# GLOBAL data ==================================================================
 
 cov_globaldata <- function() {
   
@@ -47,6 +47,9 @@ cov_globaldata <- function() {
   dat <- bind_rows(dat, world_data_china) %>%
     mutate(country_region = recode(country_region, "United Kingdom" = "UK"))
 }
+
+
+# UK Data ======================================================================
 
 cov_ukdata <- function() {
   # data sources

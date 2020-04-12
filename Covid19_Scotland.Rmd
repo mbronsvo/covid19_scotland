@@ -5,7 +5,7 @@ output:
     theme: cosmo
     orientation: rows
     logo: eera_logo_small_gimp.png
-    source_code: embed
+    source_code: https://github.com/mbronsvo/covid19_scotland/
     mathjax: NULL
     self_contained: FALSE
 runtime: shiny
@@ -30,7 +30,7 @@ load(tmp)
 Cases {data-navmenu="Scotland"}
 =======================================================================
 
-Row {data-height=10, .small-box}
+Row 
 -----------------------------------------------------------------------
 
 ### <strong>New confirmed Scotland cases as of `r format(max(scot_data$date), '%d %B %Y')`</strong>
@@ -48,20 +48,6 @@ Row {data-height=485}
 ### Daily confirmed cases
 ```{r}
 renderPlotly({
-  # ggplot(scot_data, aes(x = date, y = new_cases)) +
-  # geom_col(fill = "#297fe1") +
-  # geom_hline(yintercept = 0, size = 1, colour = "#333333") +
-  # scale_x_date(expand = c(0.005, 0.005), date_labels = "%d-%b") +
-  # scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
-  # labs(x = NULL, y = NULL, title = NULL, subtitle = NULL,
-  #      caption = "Source: github/watty62") +
-  # theme_minimal(base_size = 12) +
-  # theme(plot.margin = unit(rep(0.5, 4), "cm"),
-  #       panel.grid.major.x = element_blank(),
-  #       panel.grid.minor = element_blank(),
-  #       plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15)))
-  
-
 plot_ly(data = scot_data, x = ~date, y = ~new_cases, text = ~new_cases, color = ~I("#297fe1"), type = "bar", hovertemplate = paste('Date: %{x}',
                     '<br>New cases: %{text}<extra></extra>')) %>%
   plotly::config(displayModeBar = FALSE)  %>%
@@ -71,28 +57,12 @@ plot_ly(data = scot_data, x = ~date, y = ~new_cases, text = ~new_cases, color = 
         tickformat = "%d %B", 
         title = ""), 
         yaxis = list(title = "")) 
-  
 })
 ```
 
 ### Cumulative confirmed cases 
 ```{r}
 renderPlotly({
-
-  # ggplot(scot_data, aes(x = date, y = confirmed_cases)) +
-  # geom_line(colour = "#297fe1", size = 1) +
-  # geom_point(colour = "#297fe1", size = 2) +
-  # scale_x_date(expand = c(0.005, 0.1), date_labels = "%d-%b") +
-  # geom_hline(yintercept = 0, size = 0.5, colour = "#212121") +
-  # labs(x = NULL, y = NULL, title = NULL, subtitle = NULL,
-  #      caption = "Source: github/watty62") +
-  # theme_minimal(base_size = 12) +
-  # theme(plot.margin = unit(rep(0.5, 4), "cm"),
-  #       panel.grid.major.x = element_blank(),
-  #       panel.grid.minor = element_blank(),
-  #       plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
-  #   expand_limits(y = c(0,max(scot_data$confirmed_cases)*1.01)) 
-  
 plot_ly(data = scot_data, x = ~date, y = ~confirmed_cases, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
                hovertemplate = paste('Date: %{x}',
                         '<br>Total cases: %{y}<extra></extra>')) %>%
@@ -313,9 +283,7 @@ renderLeaflet({
   leaflet(data = filter(cases_by_area, CasesSum != 0)) %>%
     #setView(-3, 54.3, zoom = 5) %>% 
     addTiles(urlTemplate = "", attribution = 'Copyright Scottish Government, contains Ordnance Survey data © Crown copyright and database right (2019) | Data: github/watty62', options = providerTileOptions(minZoom = 5, maxZoom = 9)) %>%
-    # areas without confirmed cases
-    #addPolygons(data = filter(cases_by_area, CasesSum == 0), fillColor = "#EAEAEA", fillOpacity = 0.3, weight = 1, color = "#bdbdbd", label = ~cases_popup, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2, bringToFront = TRUE)) %>% 
-    addPolygons(fillColor = ~pal(CasesSum), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~cases_popup, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2, bringToFront = TRUE), group = "Numbers") %>% 
+addPolygons(fillColor = ~pal(CasesSum), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~cases_popup, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2, bringToFront = TRUE), group = "Numbers") %>% 
     addPolygons(fillColor = ~pal2(CasesRate), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~cases_popup_pop, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2), group ="Rate") %>%
     addLegend(pal = pal, values = ~CasesSum, opacity = 0.7, title = "Cases", position = "bottomright", group = "Numbers") %>% 
     addLegend(pal = pal2, values = ~CasesRate, opacity = 0.7, title = "Rate", position = "bottomright", group = "Rate") %>% 
@@ -354,20 +322,7 @@ Row
 ### Daily confirmed deaths
 ```{r}
 renderPlotly({
-  # ggplot(scot_deaths, aes(x = date, y = new_deaths, #text = paste0("", comma(Deaths), " deaths", format(Date, "%d %B"))
-  #                              )) +
-  #   geom_hline(yintercept = 0, size = 1, colour = "#333333") +
-  #   geom_col(fill = "#297fe1") +
-  #   scale_x_date(expand = c(0.005, 0.005), date_labels = "%d-%b") +
-  #   scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
-  #   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL, caption = "Source: github/watty62") +
-  #   theme_minimal(base_size = 12) +
-  #   theme(plot.margin = unit(rep(0.5, 4), "cm"),
-  #         panel.grid.major.x = element_blank(),
-  #         panel.grid.minor = element_blank(),
-  #         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) 
-  
-  scot_deaths %>%
+scot_deaths %>%
     plot_ly(
         x = ~date,
         y = ~new_deaths,
@@ -387,22 +342,7 @@ renderPlotly({
 ### Cumulative confirmed deaths
 ```{r}
 renderPlotly({
-  # ggplot(scot_deaths, aes(x = date, y = deaths, group = 1)) +
-  #   geom_hline(yintercept = 0, size = 1, colour = "#333333") +
-  #   geom_line(colour = "#297fe1", size = 0.5) +
-  #   geom_point(shape = 21, colour = "white", fill = "#297fe1", size = 2.5) +
-  #   scale_x_date(expand = c(0.005, 0.1), date_labels = "%d-%b") +
-  #   scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
-  #   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL, caption = "Source: github/watty62") +
-  #   theme_minimal(base_size = 12) +
-  #   theme(plot.margin = unit(rep(0.5, 4), "cm"),
-  #         panel.grid.major.x = element_blank(),
-  #         panel.grid.minor = element_blank(),
-  #         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
-  #     expand_limits(y = c(0, max(scot_deaths$deaths)*1.01))
-
-
-  plot_ly(data = scot_deaths, x = ~date, y = ~deaths, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
+plot_ly(data = scot_deaths, x = ~date, y = ~deaths, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
                hovertemplate = paste('Date: %{x}',
                         '<br>Total deaths: %{y}<extra></extra>')) %>%
   plotly::config(displayModeBar = FALSE)  %>%
@@ -637,23 +577,7 @@ Row
 ### Daily confirmed cases
 ```{r}
 renderPlotly({
-  # ggplot(uk_scot_data %>% filter(date >= "2020-01-31"), aes(x = date, y = new_cases, fill = country_region)) +
-  # geom_col() +
-  # geom_hline(yintercept = 0, size = 1, colour = "#333333") +
-  #   scale_fill_manual(values = c("#297fe1", "red")) +
-  # scale_x_date(expand = c(0.005, 0.005), date_labels = "%d-%b") +
-  # scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
-  # labs(x = NULL, y = NULL, title = NULL, subtitle = NULL,
-  #      caption = "Source: github/watty62") +
-  # theme_minimal(base_size = 12) +
-  # theme(plot.margin = unit(rep(0.5, 4), "cm"),
-  #       panel.grid.major.x = element_blank(),
-  #       panel.grid.minor = element_blank(),
-  #       plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
-  #   facet_grid(.~country_region) +
-  # theme(legend.position = "none")
-  
-   uk_scot_data %>% 
+uk_scot_data %>% 
     filter(date >= "2020-01-31") %>%
     plot_ly(
         x = ~date,
@@ -670,35 +594,13 @@ renderPlotly({
         yaxis = list(title = ""),
         showlegend = FALSE) %>%
     partial_bundle()
-
 })
 ```
 
 ### Cumulative confirmed cases 
 ```{r}
 renderPlotly({
-  
-# ggplot(uk_scot_data %>% filter(date >= "2020-01-31"), aes(x = date, y = confirmed_cases, group = country_region,
-#                                   fill = country_region, colour = country_region)) +
-#   geom_line( size = 0.5) +
-#     geom_point(shape = 21, colour = "white", size = 2.5) +
-#     scale_fill_manual(values = c("#297fe1", "#b24b29")) +
-#     scale_colour_manual(values = c("#297fe1", "#b24b29")) +
-#   scale_y_continuous(labels = comma, expand = c(0.005, 0.005), sec.axis = sec_axis(~ ., breaks = max(scot_data$confirmed_cases))) +
-#   scale_x_date(expand = c(0.005, 0.1), date_labels = "%d-%b") +
-#   geom_hline(yintercept = 0, size = 0.5, colour = "#212121") +
-#   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL,
-#        caption = "Source: github/watty62") +
-#   theme_minimal(base_size = 12) +
-#   theme(plot.margin = unit(rep(0.5, 4), "cm"),
-#         panel.grid.major.x = element_blank(),
-#         panel.grid.minor = element_blank(),
-#         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
-#     expand_limits(y = c(0,max(uk_scot_data$confirmed_cases)*1.01)) +
-#   theme(legend.position = "none")
-
-
-plot_ly(data = uk_scot_data %>% filter(date >= "2020-01-31"), x = ~date, y = ~confirmed_cases, text = ~country_region, color = ~country_region, type = "scatter", mode = "lines+markers", colors = c("#297fe1", "#b24b29"), 
+  plot_ly(data = uk_scot_data %>% filter(date >= "2020-01-31"), x = ~date, y = ~confirmed_cases, text = ~country_region, color = ~country_region, type = "scatter", mode = "lines+markers", colors = c("#297fe1", "#b24b29"), 
                hovertemplate = paste('Date: %{x}',
                         '<br>Total cases: %{y}',
                         '<br>Region: %{text}<extra></extra>')) %>%
@@ -713,7 +615,6 @@ plot_ly(data = uk_scot_data %>% filter(date >= "2020-01-31"), x = ~date, y = ~co
                      tickformat = "digit"),
         showlegend = FALSE) %>%
     partial_bundle()
-
 })
 ```
 
@@ -723,23 +624,7 @@ Row
 ### Daily confirmed deaths
 ```{r}
 renderPlotly({
-  #date of first uk death
-  # ggplot(uk_scot_data %>% filter(date >= "2020-03-06"), alpha = 0.5, aes(x = date, y = new_deaths, fill = country_region)) +
-  #   geom_hline(yintercept = 0, size = 1, colour = "#333333") +
-  #   geom_col() +
-  #   scale_fill_manual(values = c("#297fe1", "#b24b29")) +
-  #   scale_x_date(expand = c(0.005, 0.005), date_labels = "%d-%b") +
-  #   scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
-  #   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL, caption = "Source: github/watty62") +
-  #   theme_minimal(base_size = 12) +
-  #   theme(plot.margin = unit(rep(0.5, 4), "cm"),
-  #         panel.grid.major.x = element_blank(),
-  #         panel.grid.minor = element_blank(),
-  #         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
-  #   facet_grid(.~country_region) +
-  # theme(legend.position = "none")
-  
-  uk_scot_data %>% 
+uk_scot_data %>% 
     filter(date >= "2020-03-06") %>%
     plot_ly(
         x = ~date,
@@ -762,25 +647,7 @@ renderPlotly({
 ### Cumulative confirmed deaths
 ```{r}
 renderPlotly({
-  #date of first uk death
-  # ggplot(uk_scot_data %>% filter(date >= "2020-03-06"), aes(x = date, y = deaths, group = country_region,
-  #                                 fill = country_region, colour = country_region)) +
-  #   geom_hline(yintercept = 0, size = 1, colour = "#333333") +
-  #   geom_line( size = 0.5) +
-  #   geom_point(shape = 21, colour = "white", size = 2.5) +
-  #   scale_fill_manual(values = c("#297fe1", "#b24b29")) +
-  #   scale_colour_manual(values = c("#297fe1", "#b24b29")) +
-  #   scale_x_date(expand = c(0.005, 0.1), date_labels = "%d-%b") +
-  #   scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
-  #   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL, caption = "Source: github/watty62") +
-  #   theme_minimal(base_size = 12) +
-  #   theme(plot.margin = unit(rep(0.5, 4), "cm"),
-  #         panel.grid.major.x = element_blank(),
-  #         panel.grid.minor = element_blank(),
-  #         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
-  #     expand_limits(y = c(0, max(uk_scot_data$deaths)*1.01)) +
-  # theme(legend.position = "none")
-  
+#date of first uk death
 plot_ly(data = uk_scot_data %>% filter(date >= "2020-03-06"), x = ~date, y = ~deaths, text = ~country_region, color = ~country_region, type = "scatter", mode = "lines+markers", colors = c("#297fe1", "#b24b29"), 
                hovertemplate = paste('Date: %{x}',
                         '<br>Total deaths: %{y}',

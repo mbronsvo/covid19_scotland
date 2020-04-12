@@ -81,12 +81,4 @@ cov_scotdata <- function(){
   scot_data %>% 
     left_join(scot_pop, by = "health_board")
   
-  }
-
-
-
-
-cov_scotpop <- function(){
-  
-  
 }

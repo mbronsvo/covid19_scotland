@@ -7,9 +7,9 @@ source("utils.R")
 
 # Import Scottish Data -----------------------------------------------------------------------
 
-
-
 WATTY62PATH <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/"
+
+# Import Scottish Case Data ------------------------------------------------------------------
 
 WATTY62CASES <- "new_daily_cases.csv"
 WATTY62REGIONALCASES <- "regional_cases.csv"
@@ -17,13 +17,10 @@ WATTY62POP <- "HB_Populations.csv"
 WATTY62DEATHS <- "regional_deaths.csv"
 WATTY62TESTS <- "scot_tests.csv"
 
-# Health board population data
-scot_pop <- read_csv(file = paste0(WATTY62PATH, WATTY62POP))
-
 # Scottish healthboard cases data
-scot_data_raw <- read_csv(file = paste0(WATTY62PATH, WATTY62REGIONALCASES))
+scot_cases_raw <- read_csv(file = paste0(WATTY62PATH, WATTY62REGIONALCASES))
 
-scot_data <- scot_data_raw %>%
+scot_cases <- scot_case_raw %>%
   mutate(date = dmy(Date)) %>%
   select(-Date) %>%
   pivot_longer(`Ayrshire and Arran`:`Grand Total`,
@@ -37,9 +34,9 @@ scot_data <- scot_data_raw %>%
   mutate(country_region = "Scotland") %>%
   ungroup()
 
-scot_data_health_board_total <- scot_data_health_board %>%
+scot_cases_health_board_total <- scot_cases_health_board %>%
   group_by(health_board) %>%
-  summarise(CasesSum = max(confirmed_cases, na.rm = T)) %>% 
+  summarise(CasesSum = max(confirmed_cases, na.rm = T)) %>%
   ungroup()
 
 # Scottish death data
@@ -60,5 +57,19 @@ scot_deaths <- scot_deaths %>%
   mutate(country_region = "Scotland")
 
 
-scot_data_all <- select(scot_data, country_region, date, new_cases, confirmed_cases) %>%
-  full_join(select(scot_deaths, country_region, date, new_deaths, deaths), by = c("country_region", "date"))
+# Join report datasets ----------------------------------------------------------------------------
+
+scot_data <- select(
+  scot_cases,
+  country_region, date, new_cases, confirmed_cases
+) %>%
+  full_join(select(
+    scot_deaths,
+    country_region, date, new_deaths, deaths
+  ),
+  by = c("country_region", "date")
+  )
+
+# Health board population data --------------------------------------------------------------------
+
+scot_pop <- read_csv(file = paste0(WATTY62PATH, WATTY62POP))

@@ -39,7 +39,8 @@ scot_data <- scot_data_raw %>%
 
 scot_data_health_board_total <- scot_data_health_board %>%
   group_by(health_board) %>%
-  summarise(CasesSum = max(confirmed_cases, na.rm = T))
+  summarise(CasesSum = max(confirmed_cases, na.rm = T)) %>% 
+  ungroup()
 
 # Scottish death data
 scot_deaths <- read_csv(file = WATTY62DEATHS)

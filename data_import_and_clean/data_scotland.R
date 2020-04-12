@@ -1,7 +1,3 @@
-library(fs)
-library(tidyverse)
-library(lubridate)
-
 # Import Scottish Data ============================================================
 
 cov_scotdata <- function(){

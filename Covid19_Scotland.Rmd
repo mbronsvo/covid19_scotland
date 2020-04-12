@@ -27,7 +27,7 @@ load(tmp)
 ```
 
 
-Cases {data-navmenu="Cases"}
+Cases {data-navmenu="Scotland"}
 =======================================================================
 
 Row {data-height=10, .small-box}
@@ -148,7 +148,7 @@ plot_ly(data = scot_tests, x = ~date, y = ~cases_per_test, color = ~I("#297fe1")
 })  
 ```
 
-Hospital data {data-navmenu="Cases"}
+Hospital data {data-navmenu="Scotland"}
 =======================================================================
 
 Row 
@@ -332,7 +332,7 @@ renderLeaflet({
 })
 ```
 
-Deaths {data-navmenu="Deaths"} 
+Deaths {data-navmenu="Scotland"}
 =======================================================================
 
 Row
@@ -514,7 +514,7 @@ plot_ly(data = scot_tests, x = ~date, y = ~deaths_per_case, color = ~I("#297fe1"
 })
 ```
 
-Demographics {data-navmenu="Deaths"} 
+Deaths demographics {data-navmenu="Scotland"}
 =======================================================================
 Row
 -------------------------------------
@@ -540,7 +540,7 @@ renderPlotly({
 ```
 
 
-Doubling {data-icon="fa-clock-o"} 
+Doubling{data-icon="fa-clock-o" data-navmenu="Scotland"}
 =======================================================================
 Row
 -------------------------------------

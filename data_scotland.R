@@ -33,23 +33,9 @@ group_by(health_board) %>%
   replace_na(list(new_cases = 0)) %>%
   mutate(country_region = "Scotland")
 
-
-
 scot_data_health_board_total <- scot_data_health_board %>% 
   group_by(health_board) %>%
   summarise(CasesSum = max(confirmed_cases, na.rm = T))
-
-# Scottish overall cases
-scot_cases_raw <- read_csv(file = paste0(WATTY62PATH, WATTY62CASES))
-scot_cases <- scot_cases_raw %>%
-  rename("new_cases" = "New cases") %>%
-  mutate(date = lubridate::dmy(Date)) %>%
-  select(-Date) %>%
-  mutate(confirmed_cases = cumsum(new_cases)) %>%
-  mutate(doubling_time_week = 7*log(2)/log(confirmed_cases/replace_na(lag(confirmed_cases,7),0))) %>%
-  mutate(country_region = "Scotland")
-
-scot_data <- scot_cases
 
 # Scottish death data
 scot_deaths <- read_csv(file = WATTY62DEATHS) 

@@ -1,5 +1,4 @@
-rm(list = ls())
-path <- "/Users/smazeri/Documents/GitHub/covid/"
+
 
 
 # Load packages
@@ -10,9 +9,9 @@ library(httr); library(readxl)
 #library(ggsci);  
 
 # Functions for uk and world data download
-source(paste0(path,"R/data_download.R"))
+source("data_download.R")
 # Functions for log date trajectories plots
-source(paste0(path, "R/log_time_traj.R"))
+source("log_time_traj.R")
 
 # Import UK and world data
 dat_world <- cov_globaldata() 
@@ -113,7 +112,7 @@ scot_tests_long <- scot_tests %>%
 
 # Map files
 # SCOTLAND MAP
-cases_by_area <- sf::st_read(paste0(path,"SG_NHS_HealthBoards_2019c.geojson")) %>%
+cases_by_area <- sf::st_read("SG_NHS_HealthBoards_2019b.geojson") %>%
   st_transform(crs = st_crs("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")) %>%
   left_join(scot_data_health_board_total, by = c("HBName" = "health_board")) %>%
   left_join(scot_pop, by = c("HBName" = "Name")) 
@@ -168,7 +167,7 @@ last_week <- lubridate::ymd(str_remove(covid_deaths$DateCode, "w/c ")) %>% max(n
 covid_deaths_2020 <-subset(covid_deaths, DateCode == "2020" & `Cause Of Death` == "COVID-19 related" & Sex != "All" & Age != "All") %>% arrange(Age, Sex)
 
 
-save.image(file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
+save.image(file = "app_all.RData")
 
 #rm(list = ls())
 #load("app_all.RData")

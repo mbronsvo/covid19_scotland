@@ -18,7 +18,7 @@ calc_doubling <- function(x, n = 7){
 # Import Scottish Data ============================================================
 
 cov_scotdata <- function(){
-
+  
   WATTY62PATH <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/"
   WATTY62POP <- "HB_Populations.csv"
   WATTY62CASES <- "new_daily_cases.csv"
@@ -53,7 +53,6 @@ cov_scotdata <- function(){
     ungroup()
   
   # Scottish death data ----------------------------------------------------------
-  
   scot_deaths_raw  <- read_csv(file = paste0(WATTY62PATH, WATTY62DEATHS),
                           na = "x")
   
@@ -73,7 +72,7 @@ cov_scotdata <- function(){
     group_by(health_board) %>%
     arrange(date) %>% 
     mutate(new_deaths = deaths - replace_na(lag(deaths), 0)) %>%
-    mutate(doubling_time_deaths = calc_doubling(deaths, 7)) %>%
+    mutate(doubling_time_deaths = calc_doubling(deaths, n = 7)) %>%
     replace_na(list(deaths = 0)) %>%
     mutate(country_region = "Scotland")
   

@@ -17,7 +17,7 @@ $('.navbar-logo').wrap('<a href="https://www.ed.ac.uk/roslin/eeragroup" target=_
 
 
 ```{r global, include=FALSE}
-library(flexdashboard) ; library(shiny) ; library(dplyr); library(tidyr);  library(forcats); library(stringr); library(htmlwidgets);  library(RcppRoll); library(plotly); library(shinythemes);library(leaflet); library(classInt); library(ggrepel); library(scales); library(leaflet.extras);
+library(flexdashboard) ; library(shiny) ; library(dplyr); library(tidyr);  library(forcats); library(stringr); library(htmlwidgets);  library(RcppRoll); library(plotly); library(shinythemes);library(leaflet); library(classInt); library(ggrepel); library(scales); library(leaflet.extras); library(lubridate); library(purrr); library(sf);
 library(httr); library(viridis)
 
 #library(readr); library(purrr); library(sf); library(lubridate);
@@ -1130,27 +1130,33 @@ downloadHandler(
 
 About {data-icon="fa-info-circle"} 
 =======================================================================
-**Disclaimer** </br>
+
+Row {data-height=300}
+-----------------------------------------------------------------------
+### **Disclaimer** 
 This visualisation of the Scottish and United Kingdom data is based on the data available from colleagues who have been monitoring the numbers and are not official numbers. Therefore these plots should not be used for official decision making but rather are there to help the general population of the UK and particularly Scotland understand how this epidemic is unfolding and the importance of social distancing to help slow its spread.
 
 \*In the UK the number of cases is misleading at it reflects the number of people tested with symptoms who were positive i.e. confirmed cases. It is still not clear how widespread transmission has been and until serological testing is done it is not possible to know this.
 
 We have used logarithmic scales for the case and death trajectories to make it clear to see the doubling rates different populations are following.
 
-### Data sources 
+Row {data-height=400}
+-----------------------------------------------------------------------
+### **Data sources** 
 
-1. **UK Data (Cases)** https://www.arcgis.com/sharing/rest/content/items/e5fd11150d274bebaaf8fe2a7a2bda11/data
-2. **UK Data (Deaths)** https://github.com/traffordDataLab/covid-19/raw/master/data/daily_deaths.csv
-3. **UK Regional data**
-https://github.com/tomwhite/covid-19-uk-data/tree/master/data </br>
-Data for England is based on UK data minus Scotland, NI, and Wales data. 
-4. **Scottish Data ** https://github.com/watty62/Scot_covid19/blob/master/data/processed/regional_cases.csv
-5. **Maps (Scotland)** https://data.gov.uk/dataset/27d0fe5f-79bb-4116-aec9-a8e565ff756a/nhs-health-boards
-6. **Maps (UK)** https://gadm.org/
-7. **World data** https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/ and https://covid.ourworldindata.org/data/ecdc/full_data.csv
-<!-- 7. **Thumbnail** https://www.newscientist.com/term/covid-19/ -->
+1. [**UK Data (Cases)**](https://www.arcgis.com/sharing/rest/content/items/e5fd11150d274bebaaf8fe2a7a2bda11/data)
+2. [**UK Data (Deaths)**](https://github.com/traffordDataLab/covid-19/raw/master/data/daily_deaths.csv)
+3. [**UK Regional data**](https://github.com/tomwhite/covid-19-uk-data/tree/master/data) Note: Data for England is based on UK data minus Scotland, NI, and Wales data. 
+4. [**Scottish Data**](https://github.com/watty62/Scot_covid19/blob/master/data/processed)
+5. [**Scottish Deaths Demographics**](https://statistics.gov.scot/slice?dataset=http%3A%2F%2Fstatistics.gov.scot%2Fdata%2Fdeaths-involving-coronavirus-covid-19)
+6. [**Scottish hospital cases data**](https://www.gov.scot/publications/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/)
+7. [**Maps (Scotland)**](https://data.gov.uk/dataset/27d0fe5f-79bb-4116-aec9-a8e565ff756a/nhs-health-boards)
+8. [**Maps (UK)**](https://gadm.org/)
+9. [**World data**](https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/ and https://covid.ourworldindata.org/data/ecdc/full_data.csv)
  
-### Credits
+Row {data-height=300}
+-----------------------------------------------------------------------
+### **Credits**
 This site and data visualisation was prepared by members of the Epidemiology, Economics and Risk Assessment (<a href="https://www.ed.ac.uk/roslin/eeragroup" target="_blank">EERA</a>) Group at the University of Edinburgh, the Royal Dick School of Veterinary Studies (R(D)SVS). Please email us at mark.bronsvoort@roslin.ed.ac.uk with any questions or comments. 
 
-This application was built using the R Shiny package based on code adapted from  https://trafforddatalab.shinyapps.io/covid-19/#section-cases. Scottish data was put together by github/watty62, while UK death data was published by Public Health England and put together by github.com/traffordDataLab. Trajectory plots inspired by https://www.ft.com/coronavirus-latest?fbclid=IwAR0GrC7Q5Tl1W_XAEhkm_EbplUNvZ827D5L0_rZWI1jKzqeY2d_EHMJ5GDA and https://aatishb.com/covidtrends/
+This application was built using the R Shiny package based on code adapted from https://trafforddatalab.shinyapps.io/covid-19. Scottish data was publishd by the Scottish Government and put together by [github/watty62](https://github.com/watty62/), while UK death data was published by Public Health England and put together by [github.com/traffordDataLab](https://github.com/traffordDataLab). Trajectory plots inspired by https://www.ft.com/coronavirus-latest?fbclid=IwAR0GrC7Q5Tl1W_XAEhkm_EbplUNvZ827D5L0_rZWI1jKzqeY2d_EHMJ5GDA and https://aatishb.com/covidtrends/

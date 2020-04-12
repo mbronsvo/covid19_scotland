@@ -28,22 +28,6 @@ library(httr); library(readxl)
 source("R/log_time_traj.R")
 
 
-
-
-# Scottish tests
-scot_tests <- read_csv(file = WATTY62TESTS) 
-scot_tests <- scot_tests %>%
-  mutate(date = seq(dmy("24-Jan-2020"),dmy("24-Jan-2020")+days(nrow(scot_tests)-1), by = 1)) %>%
-  left_join(select(scot_deaths, date,new_deaths, deaths), by = "date") %>%
-  mutate(deaths_per_case = deaths/`Total Positive`,
-         cases_per_test = `Total Positive`/Total)
-
-scot_tests_long <- scot_tests %>%
-  pivot_longer(cols = `Today Positive`:`Today Negative`, names_to = "Result", values_to = "Number") %>%
-  mutate(Result = factor(recode(Result, "Today Negative" = "Negative",
-                                  "Today Positive" = "Positive"), levels = c("Positive", "Negative")))
-
-
 # Map files
 # SCOTLAND MAP
 cases_by_area <- sf::st_read("SG_NHS_HealthBoards_2019c.geojson") %>%

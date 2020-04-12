@@ -168,8 +168,13 @@ last_week <- lubridate::ymd(str_remove(covid_deaths$DateCode, "w/c ")) %>% max(n
 covid_deaths_2020 <-subset(covid_deaths, DateCode == "2020" & `Cause Of Death` == "COVID-19 related" & Sex != "All" & Age != "All") %>% arrange(Age, Sex)
 
 
-save.image(file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
-
+#save.image(file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
+save(cases_by_area,cov_globaldata,cov_offset, cov_trajplot, cov_ukdata,
+     covid_deaths_2020, dat_uk, dat_uk_total, dat_world, data_hosp_hosp, 
+     data_hosp_icu, last_week, 
+     ref, 
+     scot_cases, scot_data, scot_data_all, scot_data_health_board, scot_data_health_board_total,
+     scot_data_raw, scot_deaths, scot_pop,  scot_tests, scot_tests_long, uk_scot_data, file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
 #rm(list = ls())
 #load("app_all.RData")
 

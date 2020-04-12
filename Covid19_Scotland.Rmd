@@ -1,0 +1,1322 @@
+---
+title: "COVID-19 Scotland"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: cosmo
+    orientation: rows
+    logo: eera_logo_small_gimp.png
+    source_code: embed
+    mathjax: NULL
+    self_contained: FALSE
+runtime: shiny
+---
+
+<script>
+$('.navbar-logo').wrap('<a href="https://www.ed.ac.uk/roslin/eeragroup" target=_blank>');
+</script>
+
+```{r global_prev, include=FALSE, eval = FALSE}
+# Load packages
+library(flexdashboard) ; library(shiny) ; library(readr); library(dplyr); library(tidyr); library(purrr); library(forcats); library(stringr); library(htmlwidgets); library(lubridate); library(sf); library(RcppRoll); library(plotly); library(shinythemes);library(leaflet); library(classInt); library(ggrepel); library(scales); library(leaflet.extras);library(viridis)
+library(httr); library(readxl)
+#library(tidyverse) ; library(httr) ;  ; library(readxl) ; library(DT) ; #library(rvest); #library(htmltools) ;  library(xml2);
+#library(RColorBrewer); 
+#library(ggsci);  
+
+# Functions for uk and world data download
+source("R/data_download.R")
+# Functions for log date trajectories plots
+source("R/log_time_traj.R")
+
+# Import UK and world data
+dat_world <- cov_globaldata() 
+dat_uk <- cov_ukdata() 
+dat_uk_total <- dat_uk %>% 
+  group_by(country_region) %>% 
+  summarise(CumDeaths = max(deaths,na.rm = T))
+
+# Import Scottish Data
+WATTY62CASES <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/new_daily_cases.csv"
+WATTY62REGIONALCASES <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/regional_cases.csv"
+WATTY62POP <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/HB_Populations.csv"
+WATTY62DEATHS <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/regional_deaths.csv"
+WATTY62TESTS <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/scot_tests.csv"
+
+# Health board population data
+scot_pop <- read_csv(file =WATTY62POP )
+
+# Scottish healthboard cases data
+scot_data_raw <- read_csv(file = WATTY62REGIONALCASES) 
+#write_csv(scot_data_raw, "regional_cases_upto_07042020.csv")
+
+scot_data <- scot_data_raw %>%
+             rename(confirmed_cases= `Grand Total`) %>%
+             mutate(new_cases = confirmed_cases - replace_na(lag(confirmed_cases),0)) %>%
+             mutate(doubling_time_week = 7*log(2)/log(confirmed_cases/replace_na(lag(confirmed_cases,7),0))) %>%
+             mutate(date = lubridate::dmy(Date)) %>%
+             select(-Date) %>%
+             replace_na(list(new_cases = 0)) %>%
+             mutate(country_region = "Scotland")
+
+scot_data_health_board <- scot_data %>% 
+  select(date, `Ayrshire and Arran`:`Western Isles`) %>%
+  pivot_longer(`Ayrshire and Arran`:`Western Isles`,
+               names_to = "health_board",
+               values_to = "confirmed_cases") %>% 
+  group_by(health_board) %>%
+  mutate(new_cases = confirmed_cases - replace_na(lag(confirmed_cases), 0)) %>%
+  ungroup() %>%
+  replace_na(list(new_cases = 0))
+
+scot_data_health_board_total <- scot_data_health_board %>% 
+                                group_by(health_board) %>%
+                                summarise(CasesSum = max(confirmed_cases, na.rm = T))
+
+# Scottish overall cases
+scot_cases <- read_csv(file = WATTY62CASES) %>%
+  rename("new_cases" = "New cases") %>%
+  mutate(date = lubridate::dmy(Date)) %>%
+  mutate(confirmed_cases = cumsum(new_cases)) %>%
+  mutate(doubling_time_week = 7*log(2)/log(confirmed_cases/replace_na(lag(confirmed_cases,7),0))) %>%
+  select(-Date) %>%
+  mutate(country_region = "Scotland")
+
+scot_data <- scot_cases
+
+# Scottish death data
+scot_deaths <- read_csv(file = WATTY62DEATHS) 
+scot_deaths[scot_deaths == "x"] <- NA             
+
+scot_deaths <- scot_deaths %>%
+             mutate(Date = case_when(Date == "10-Apr-2020" & lag(.$Date) == "31-Mar-2020" ~ "1-Apr-2020", 
+                    TRUE ~ Date)) %>%
+             rename(deaths= `Grand Total`) %>%
+             mutate(new_deaths = deaths - replace_na(lag(deaths),0)) %>%
+             mutate(doubling_time_week = 7*log(2)/log(deaths/replace_na(lag(deaths,7),0))) %>%
+             mutate(date = lubridate::dmy(Date)) %>%
+             select(-Date) %>%
+             replace_na(list(Deaths = 0)) %>%
+  mutate(country_region = "Scotland")
+
+
+scot_data_all <- select(scot_data, country_region, date, new_cases, confirmed_cases) %>%
+                full_join(select(scot_deaths, country_region, date, new_deaths, deaths), by = c("country_region", "date"))
+
+uk_scot_data <- dat_uk %>%
+                filter(country_region == "United Kingdom") %>%
+                arrange(date) %>%
+                mutate(new_deaths = deaths - replace_na(lag(deaths),0)) %>%
+                mutate(new_cases = confirmed_cases - replace_na(lag(confirmed_cases), 0)) %>%
+                mutate(country_region = recode(country_region, "United Kingdom" = "UK")) %>%
+                bind_rows(scot_data_all)
+                
+
+# Scottish tests
+scot_tests <- read_csv(file = WATTY62TESTS) 
+scot_tests <- scot_tests %>%
+  mutate(date = seq(dmy("24-Jan-2020"),dmy("24-Jan-2020")+days(nrow(scot_tests)-1), by = 1)) %>%
+  left_join(select(scot_deaths, date,new_deaths, deaths), by = "date") %>%
+  mutate(deaths_per_case = deaths/`Total Positive`,
+         cases_per_test = `Total Positive`/Total)
+
+scot_tests_long <- scot_tests %>%
+  pivot_longer(cols = `Today Positive`:`Today Negative`, names_to = "Result", values_to = "Number") %>%
+  mutate(Result = factor(recode(Result, "Today Negative" = "Negative",
+                                  "Today Positive" = "Positive"), levels = c("Positive", "Negative")))
+
+
+# Map files
+# SCOTLAND MAP
+cases_by_area <- sf::st_read("SG_NHS_HealthBoards_2019c.geojson") %>%
+                 st_transform(crs = st_crs("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")) %>%
+                 left_join(scot_data_health_board_total, by = c("HBName" = "health_board")) %>%
+                  left_join(scot_pop, by = c("HBName" = "Name")) 
+
+cases_by_area <- cbind(cases_by_area, st_coordinates(st_centroid(cases_by_area)))
+
+cases_by_area$cases_popup <- paste(cases_by_area$HBName, cases_by_area$CasesSum, "cases", sep = " ")
+
+cases_by_area$CasesRate <- 100000* cases_by_area$CasesSum/cases_by_area$Population
+cases_by_area$cases_popup_pop <- paste(cases_by_area$HBName, round(cases_by_area$CasesRate,2), "cases per 100,000 population", sep = " ")
+
+## Covid daily hospital data
+myurl <- "https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/04/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/documents/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/govscot%3Adocument/Data%2BTable%2B%252810-04-2020%2529.xlsx?forceDownload=true"
+GET(myurl, write_disk(tmp <- tempfile(fileext = ".xlsx")))
+
+data_hosp <- read_excel(tmp, sheet = "Table 1", skip = 3)
+
+data_hosp <- data_hosp %>%
+  rename("date" = "...1",
+         "ICU_confirmed" = "Confirmed...2",
+         "ICU_suspected" ="Suspected...3", 
+         "ICU_total" = "Total...4",
+         "Hospital_confirmed" = "Confirmed...5",
+         "Hospital_suspected" = "Suspected...6",
+         "Hospital_total" = "Total...7" ) %>%
+  filter(!is.na(ICU_total)) %>%
+  mutate(date = as.Date(as.numeric(date), origin = "1899-12-30")) %>%
+  mutate(ICU_confsusp = case_when(is.na(ICU_confirmed) & is.na(ICU_suspected) ~ ICU_total)) %>%
+  mutate(Hospital_confsusp = case_when(is.na(Hospital_confirmed) & is.na(Hospital_suspected) ~ Hospital_total)) %>%
+  select(date, contains("ICU"), everything())
+
+data_hosp_icu <- data_hosp %>%
+  select(date, contains("ICU")) %>%
+  pivot_longer(cols = c(ICU_confirmed, ICU_suspected, ICU_confsusp), names_to = "Patients", values_to = "Number") %>%
+  mutate(Patients = recode(Patients,  "ICU_confsusp" = "Confirmed/Suspected", 
+                    "ICU_confirmed" = "Confirmed", 
+                    "ICU_suspected" = "Suspected")) %>%
+  mutate(Patients = factor(Patients, levels = c("Confirmed/Suspected", "Confirmed", "Suspected")))
+
+data_hosp_hosp <- data_hosp %>%
+  select(date, contains("hospital")) %>%
+  pivot_longer(cols = c(Hospital_confirmed, Hospital_suspected, Hospital_confsusp), names_to = "Patients", values_to = "Number") %>%
+  mutate(Patients = recode(Patients,  "Hospital_confsusp" = "Confirmed/Suspected", 
+                           "Hospital_confirmed" = "Confirmed", 
+                           "Hospital_suspected" = "Suspected")) %>%
+  mutate(Patients = factor(Patients, levels = c("Confirmed/Suspected", "Confirmed", "Suspected")))
+
+# Covid death demographics
+myurl2 <- "https://statistics.gov.scot/downloads/cube-table?uri=http%3A%2F%2Fstatistics.gov.scot%2Fdata%2Fdeaths-involving-coronavirus-covid-19"
+covid_deaths<- read_csv(myurl2)
+last_week <- lubridate::ymd(str_remove(covid_deaths$DateCode, "w/c ")) %>% max(na.rm = T)
+covid_deaths_2020 <-subset(covid_deaths, DateCode == "2020" & `Cause Of Death` == "COVID-19 related" & Sex != "All" & Age != "All") %>% arrange(Age, Sex)
+
+```
+
+```{r global, include=FALSE, eval = TRUE}
+library(flexdashboard) ; library(shiny) ; library(readr); library(dplyr); library(tidyr); library(purrr); library(forcats); library(stringr); library(htmlwidgets); library(lubridate); library(sf); library(RcppRoll); library(plotly); library(shinythemes);library(leaflet); library(classInt); library(ggrepel); library(scales); library(leaflet.extras);
+library(httr); library(viridis)
+
+myurl <- "https://www.dropbox.com/s/453v8vfpghe9bre/app_all.RData?raw=1"
+GET(myurl, write_disk(tmp <- tempfile(fileext = ".Rdata")))
+load(tmp)
+```
+
+
+Cases {data-navmenu="Cases"}
+=======================================================================
+
+Row {data-height=10, .small-box}
+-----------------------------------------------------------------------
+
+### <strong>New confirmed Scotland cases as of `r format(max(scot_data$date), '%d %B %Y')`</strong>
+```{r}
+valueBox(comma(pull(filter(scot_data, date == max(date)), new_cases)), color = "#297fe1")
+```
+
+### <strong>Total confirmed Scotland cases as of `r format(max(scot_data$date), '%d %B %Y')`</strong>
+```{r}
+valueBox(comma(max(scot_data$confirmed_cases)), color = "#297fe1")
+```
+
+Row {data-height=485}
+-------------------------------------
+### Daily confirmed cases
+```{r}
+renderPlotly({
+  # ggplot(scot_data, aes(x = date, y = new_cases)) +
+  # geom_col(fill = "#297fe1") +
+  # geom_hline(yintercept = 0, size = 1, colour = "#333333") +
+  # scale_x_date(expand = c(0.005, 0.005), date_labels = "%d-%b") +
+  # scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
+  # labs(x = NULL, y = NULL, title = NULL, subtitle = NULL,
+  #      caption = "Source: github/watty62") +
+  # theme_minimal(base_size = 12) +
+  # theme(plot.margin = unit(rep(0.5, 4), "cm"),
+  #       panel.grid.major.x = element_blank(),
+  #       panel.grid.minor = element_blank(),
+  #       plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15)))
+  
+
+plot_ly(data = scot_data, x = ~date, y = ~new_cases, text = ~new_cases, color = ~I("#297fe1"), type = "bar", hovertemplate = paste('Date: %{x}',
+                    '<br>New cases: %{text}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(barmode = 'stack',
+         xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        title = ""), 
+        yaxis = list(title = "")) 
+  
+})
+```
+
+### Cumulative confirmed cases 
+```{r}
+renderPlotly({
+
+  # ggplot(scot_data, aes(x = date, y = confirmed_cases)) +
+  # geom_line(colour = "#297fe1", size = 1) +
+  # geom_point(colour = "#297fe1", size = 2) +
+  # scale_x_date(expand = c(0.005, 0.1), date_labels = "%d-%b") +
+  # geom_hline(yintercept = 0, size = 0.5, colour = "#212121") +
+  # labs(x = NULL, y = NULL, title = NULL, subtitle = NULL,
+  #      caption = "Source: github/watty62") +
+  # theme_minimal(base_size = 12) +
+  # theme(plot.margin = unit(rep(0.5, 4), "cm"),
+  #       panel.grid.major.x = element_blank(),
+  #       panel.grid.minor = element_blank(),
+  #       plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
+  #   expand_limits(y = c(0,max(scot_data$confirmed_cases)*1.01)) 
+  
+plot_ly(data = scot_data, x = ~date, y = ~confirmed_cases, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Total cases: %{y}<extra></extra>')) %>%
+plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        title = ""), 
+        yaxis = list(title = "",
+                     range=c(0,max(scot_data$confirmed_cases) + 50),
+                     tickformat = "digit"),
+        showlegend = FALSE) 
+})
+```
+
+
+Row {data-height=485}
+-------------------------------------
+### Daily tests conducted
+```{r}
+renderPlotly({
+plot_ly(data = scot_tests_long, x = ~date, y = ~Number, text = ~Conducted, color = ~Result, type = "bar", colors = c("#b24b29", "#297fe1"), 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Result P/N: %{y}',
+                        '<br>Total test: %{text}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(barmode = 'stack',
+         xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        #showgrid = F,
+        title = ""), 
+        yaxis = list(title = "",
+                     tickformat = "digit"),
+        legend = list(x = 0.1, y = 0.9)) 
+})
+```
+
+### Confirmed cases per test conducted\*
+```{r}
+renderPlotly({
+plot_ly(data = scot_tests, x = ~date, y = ~cases_per_test, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Cases per test: %{y:.2f}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        title = ""), 
+        yaxis = list(title = "",
+                     range=c(0,max(scot_tests$deaths_per_case) + 0.01)),
+        showlegend = FALSE) 
+})  
+```
+
+Hospital data {data-navmenu="Cases"}
+=======================================================================
+
+Row 
+-----------------------------------------------------------------------
+
+### Number of Covid-19 patients in hospital as of `r format(max(data_hosp_hosp$date), '%d %B %Y')`
+```{r}
+renderPlotly({
+  plot_ly(data = data_hosp_hosp, x = ~date, y = ~Number, text = ~Hospital_total, 
+        color = ~Patients, type = "bar", #colors = c("#b24b29", "#297fe1", "#009E73"), 
+        colors = viridis(3, option = "D")[c(2,1,3)],
+        hovertemplate = paste('Date: %{x}',
+                              '<br>Number: %{y}',
+                              '<br>Total: %{text}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(barmode = 'stack',
+         xaxis = list(
+           type = 'date',
+           tickformat = "%d %B", 
+           #showgrid = F,
+           title = ""), 
+         yaxis = list(title = "",
+                      tickformat = "digit"),
+          legend = list(x = 0.1, y = 0.9)
+         ) %>%
+    partial_bundle()
+})
+```
+
+
+### Number of Covid-19 patients in ICU `r format(max(data_hosp_icu$date), '%d %B %Y')`
+```{r}
+renderPlotly({
+ 
+plot_ly(data = data_hosp_icu, x = ~date, y = ~Number, text = ~ICU_total, 
+        color = ~Patients, type = "bar", #colors = c("#b24b29", "#297fe1", "#009E73"), 
+        colors = viridis(3, option = "D")[c(2,1,3)],
+        hovertemplate = paste('Date: %{x}',
+                              '<br>Number: %{y}',
+                              '<br>Total: %{text}<extra></extra>'),
+        showlegend = F) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(barmode = 'stack',
+         xaxis = list(
+           type = 'date',
+           tickformat = "%d %B", 
+           #showgrid = F,
+           title = ""), 
+         yaxis = list(title = "",
+                      tickformat = "digit"),
+         #showlegend = FALSE
+         legend = list(x = 0.1, y = 0.9)
+         ) %>%
+    partial_bundle()
+})
+```
+
+Health Boards 
+=======================================================================
+Row {data-height=485}
+-------------------------------------
+
+### Cumulative confirmed cases by Health Board as of `r format(max(dmy(scot_data_raw$Date)), '%d %B %Y')`
+
+```{r}
+renderPlotly({
+ft_fill <- "white"
+
+cov_offset <- function(df, ref = 10, var){
+  day_zero <- df %>% 
+    arrange(date) %>% 
+    filter({cases} >= ref) %>% 
+    pull(date) %>% 
+    min()
+  
+  df %>% 
+    mutate(days = date - day_zero) %>% 
+    filter(days >= 0) %>% 
+    mutate(days = as.numeric(days))
+}
+
+ref <- 10
+
+ts <- scot_data_raw %>% 
+  pivot_longer(`Ayrshire and Arran`:`Grand Total`,
+               names_to = "health_board",
+               values_to = "cases") %>% 
+  mutate(health_board = fct_relevel(health_board, "Grand Total", after = Inf)) %>% 
+  mutate(date = lubridate::dmy(Date)) %>% 
+  select(-Date, date, health_board, cases) %>% 
+  group_by(health_board) %>% 
+  nest() %>% 
+  mutate(offset = map(data, cov_offset, ref = ref, var = cases)) %>% 
+  unnest(offset) %>% 
+  select(-data)
+
+line_2 <- tibble( days = seq(0, max(ts$days)-8)) %>% 
+  mutate(cases = c(ref, ref * exp(log(2) / 2) ^ (1:(n()-1))))
+
+line_3 <- tibble( days = seq(0, max(ts$days))) %>% 
+  mutate(cases = c(ref, ref * 1.260 ^ (1:(n()-1))))
+
+line_7 <- tibble( days = seq(0, max(ts$days))) %>% 
+  mutate(cases = c(ref, ref * 1.104 ^ (1:(n()-1))))
+
+p<- ts %>% 
+  group_by(health_board) %>% 
+  mutate(label = if_else(days == max(days),
+                         as.character(health_board), NA_character_)) %>%
+  ggplot() +
+  aes(x = days, cases, colour = health_board) +
+  geom_line(lwd = 0.75, alpha = 0.75) +
+  geom_point(size = 1) +
+  #geom_label_repel(aes(label = label),
+  #                 nudge_x = 1,
+  #                 na.rm = TRUE,
+  #            fill = ft_fill) +
+  scale_x_continuous(breaks = function(x) seq(0, round(max(x)), 5)) +
+  scale_y_continuous(trans = "log10",
+                     breaks = c(1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 5000),
+                     labels = scales::comma_format()) +
+  labs(x = str_glue("Days since {ref}th case"),
+       y = "Cumulative cases",
+       caption = "dotted line: doubling every 3 days; dashed line: doubling every 7 days") +
+  geom_line(data = line_2, aes(x = days, y = cases), colour = "grey30", linetype = "twodash") +
+  geom_line(data = line_3, aes(x = days, y = cases), colour = "grey30", lty = 3) +
+  geom_line(data = line_7, aes(x = days, y = cases), colour = "grey30", lty = 2) +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none",
+        plot.background = element_rect(fill = ft_fill),
+        panel.background = element_rect(fill = ft_fill),
+        panel.grid.major.y = element_line(colour = "grey70",
+                                          linetype = "solid",
+                                          size = 0.25),
+        panel.grid.major.x = element_line(colour = "grey70",
+                                          linetype = "solid",
+                                          size = 0.25))
+
+w <- ggplotly(p) %>%
+    partial_bundle()
+
+#w$x$data
+
+w %>%
+  style(text = "Doubling in 2 days", traces = 14) %>%
+  style(text = "Doubling in 3 days", traces = 15) %>%
+  style(text = "Doubling in 7 days", traces = 16)
+
+})
+```
+
+
+
+### Confirmed cases by Health Board in Scotland
+```{r}
+renderLeaflet({
+  breaks <- classIntervals(cases_by_area$CasesSum, n = 4, style = "jenks")$brks
+  pal <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
+    breaks <- classIntervals(cases_by_area$CasesRate, n = 4, style = "jenks")$brks
+  pal2 <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
+  
+  leaflet(data = filter(cases_by_area, CasesSum != 0)) %>%
+    #setView(-3, 54.3, zoom = 5) %>% 
+    addTiles(urlTemplate = "", attribution = 'Copyright Scottish Government, contains Ordnance Survey data © Crown copyright and database right (2019) | Data: github/watty62', options = providerTileOptions(minZoom = 5, maxZoom = 9)) %>%
+    # areas without confirmed cases
+    #addPolygons(data = filter(cases_by_area, CasesSum == 0), fillColor = "#EAEAEA", fillOpacity = 0.3, weight = 1, color = "#bdbdbd", label = ~cases_popup, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2, bringToFront = TRUE)) %>% 
+    addPolygons(fillColor = ~pal(CasesSum), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~cases_popup, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2, bringToFront = TRUE), group = "Numbers") %>% 
+    addPolygons(fillColor = ~pal2(CasesRate), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~cases_popup_pop, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2), group ="Rate") %>%
+    addLegend(pal = pal, values = ~CasesSum, opacity = 0.7, title = "Cases", position = "bottomright", group = "Numbers") %>% 
+    addLegend(pal = pal2, values = ~CasesRate, opacity = 0.7, title = "Rate", position = "bottomright", group = "Rate") %>% 
+      addLayersControl(
+    #baseGroups = c("Numbers", "Rate"),
+    overlayGroups = c("Numbers", "Rate"),
+    options = layersControlOptions(collapsed = FALSE)) %>%
+    hideGroup("Rate") %>%
+    addFullscreenControl() %>% 
+    addResetMapButton() %>% 
+    onRender(
+      "function(el, t) {var myMap = this;myMap._container.style['background'] = '#ffffff';}",
+      paste0("function(el, x) {$('head').append(","\'\'",");}"))
+})
+```
+
+Deaths {data-navmenu="Deaths"} 
+=======================================================================
+
+Row
+-------------------------------------
+
+### <strong>New confirmed Scotland deaths as of `r format(max(scot_deaths$date), '%d %B %Y')`</strong>
+```{r}
+valueBox(comma(pull(filter(scot_deaths, date == max(date)), new_deaths)), color = "#297fe1")
+```
+
+### <strong>Total confirmed Scotland deaths as of `r format(max(scot_deaths$date), '%d %B %Y')`</strong>
+```{r}
+valueBox(comma(max(scot_deaths$deaths)), color = "#297fe1")
+```
+
+Row
+-------------------------------------
+
+### Daily confirmed deaths
+```{r}
+renderPlotly({
+  # ggplot(scot_deaths, aes(x = date, y = new_deaths, #text = paste0("", comma(Deaths), " deaths", format(Date, "%d %B"))
+  #                              )) +
+  #   geom_hline(yintercept = 0, size = 1, colour = "#333333") +
+  #   geom_col(fill = "#297fe1") +
+  #   scale_x_date(expand = c(0.005, 0.005), date_labels = "%d-%b") +
+  #   scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
+  #   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL, caption = "Source: github/watty62") +
+  #   theme_minimal(base_size = 12) +
+  #   theme(plot.margin = unit(rep(0.5, 4), "cm"),
+  #         panel.grid.major.x = element_blank(),
+  #         panel.grid.minor = element_blank(),
+  #         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) 
+  
+  scot_deaths %>%
+    plot_ly(
+        x = ~date,
+        y = ~new_deaths,
+        color = I("#297fe1"),
+        type = "bar",
+  hovertemplate = paste('Date: %{x}',
+                        '<br>New deaths: %{y}<extra></extra> ')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", title = ""), 
+        yaxis = list(title = "")) %>%
+    partial_bundle()
+})
+```
+
+### Cumulative confirmed deaths
+```{r}
+renderPlotly({
+  # ggplot(scot_deaths, aes(x = date, y = deaths, group = 1)) +
+  #   geom_hline(yintercept = 0, size = 1, colour = "#333333") +
+  #   geom_line(colour = "#297fe1", size = 0.5) +
+  #   geom_point(shape = 21, colour = "white", fill = "#297fe1", size = 2.5) +
+  #   scale_x_date(expand = c(0.005, 0.1), date_labels = "%d-%b") +
+  #   scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
+  #   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL, caption = "Source: github/watty62") +
+  #   theme_minimal(base_size = 12) +
+  #   theme(plot.margin = unit(rep(0.5, 4), "cm"),
+  #         panel.grid.major.x = element_blank(),
+  #         panel.grid.minor = element_blank(),
+  #         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
+  #     expand_limits(y = c(0, max(scot_deaths$deaths)*1.01))
+
+
+  plot_ly(data = scot_deaths, x = ~date, y = ~deaths, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Total deaths: %{y}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        title = ""), 
+        yaxis = list(title = "",
+                     range=c(0,max(scot_deaths$deaths + 5)),
+                     tickformat = "digit"),
+        showlegend = FALSE) %>%
+    partial_bundle()
+})
+```
+
+Row
+-------------------------------------
+
+### Cumulative confirmed deaths by UK Region as of `r format(max(ymd(dat_uk$date)), '%d %B %Y')`
+```{r}
+renderPlotly({
+cov_offset <- function(df, ref = 10, var){
+  day_zero <- df %>% 
+    arrange(date) %>% 
+    filter({deaths} >= ref) %>% 
+    pull(date) %>% 
+    min()
+  
+  df %>% 
+    mutate(days = date - day_zero) %>% 
+    filter(days >= 0) %>% 
+    mutate(days = as.numeric(days))
+}
+
+ref <- 10
+
+ts <- dat_uk %>% 
+  mutate(date = lubridate::ymd(date)) %>% 
+  select(date, deaths, country_region, -confirmed_cases) %>% 
+  group_by(country_region) %>% 
+  nest() %>% 
+  mutate(offset = map(data, cov_offset, ref = ref, var = confirmed_cases)) %>% 
+  unnest(offset) %>% 
+  select(-data)
+
+line_2 <- tibble( days = seq(0, max(ts$days))) %>% 
+  mutate(cases = c(ref, ref * exp(log(2) / 2) ^ (1:(n()-1))))
+
+line_3 <- tibble( days = seq(0, max(ts$days))) %>% 
+  mutate(cases = c(ref, ref * exp(log(2) / 3) ^ (1:(n()-1))))
+
+line_7 <- tibble( days = seq(0, max(ts$days))) %>% 
+  mutate(cases = c(ref, ref * exp(log(2) / 7) ^ (1:(n()-1))))
+
+
+p <- ggplot(ts) +
+  aes(x = days, deaths, colour = country_region) +
+  geom_line(lwd = 0.75, alpha = 0.75) +
+  geom_point(size = 1) +
+  scale_y_log10() +
+  labs(#title = str_glue("Covid19 deaths in UK by Region as of {format(max(ts$date), '%d %B %Y')}"),
+       #subtitle = "data from: TOMWHITE data",
+       x = str_glue("Days since {ref}th death"),
+       y = "Cumulative deaths",
+       colour = "Region",
+       caption = "dotted line: doubling every 3 days; dashed line: doubling every 7 days") +
+  geom_line(data = line_2, aes(x = days, y = cases), colour = "grey70", linetype = "twodash") +
+  geom_line(data = line_3, aes(x = days, y = cases), colour = "grey70", lty = 3) +
+  geom_line(data = line_7, aes(x = days, y = cases), colour = "grey50", lty = 2) +
+  theme(legend.position = "none") +
+  theme_bw(base_size = 12) +
+  theme(legend.position = "none",
+        plot.background = element_rect(fill = "white"),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major.y = element_line(colour = "grey70",
+                                          linetype = "solid",
+                                          size = 0.25),
+        panel.grid.major.x = element_line(colour = "grey70",
+                                          linetype = "solid",
+                                          size = 0.25))
+
+w <- ggplotly(p) %>%
+    partial_bundle()
+
+#w$x$data
+
+w %>%
+  style(text = "Doubling in 2 days", traces = 6) %>%
+  style(text = "Doubling in 3 days", traces = 7) %>%
+  style(text = "Doubling in 7 days", traces = 8)
+})
+```
+
+### Deaths per confirmed cases\*
+```{r}
+renderPlotly({
+plot_ly(data = scot_tests, x = ~date, y = ~deaths_per_case, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Deaths per case: %{y:.2f}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        title = ""), 
+        yaxis = list(title = "",
+                     range=c(0,max(scot_tests$deaths_per_case) + 0.1)),
+        showlegend = FALSE) %>%
+    partial_bundle()
+})
+```
+
+Demographics {data-navmenu="Deaths"} 
+=======================================================================
+Row
+-------------------------------------
+
+### Scotland Covid-19 related deaths data upto week commencing `r last_week`
+```{r}
+renderPlotly({
+ plot_ly(covid_deaths_2020, x = ~Age, y = ~Value, type = 'bar', color = ~ Sex, text = ~Sex, colors = viridis(3)[c(1,2)],
+         hovertemplate = paste('Age group: %{x}',
+                               '<br>Gender: %{text}',
+                              '<br>Number: %{y}<extra></extra>')) %>%
+         plotly::config(displayModeBar = FALSE)  %>%
+         layout(xaxis = list(
+                #showgrid = F,
+                title = ""), 
+                yaxis = list(title = "",
+                tickformat = "digit"),
+                legend = list(x = 0.1, y = 0.9)
+                 )  %>%
+    partial_bundle()
+    
+})
+```
+
+
+Doubling {data-icon="fa-clock-o"} 
+=======================================================================
+Row
+-------------------------------------
+
+### <strong>Doubling time for the number of cases over the past 7 days as of `r format(max(scot_data$date), '%d %B %Y')`</strong>
+```{r}
+valueBox(paste(round(pull(filter(scot_data, date == max(date)), doubling_time_week),2), "days", sep = " "), color = "#297fe1")
+```
+
+### <strong>Doubling time for the number of deaths over the past 7 days as of `r format(max(scot_deaths$date), '%d %B %Y')`</strong>
+```{r}
+valueBox(paste(round(pull(filter(scot_deaths, date == max(date)), doubling_time_week),2), "days", sep = " "), color = "#297fe1")
+```
+
+Row
+-------------------------------------
+### Doubling time for the number of cases over the past 7 days
+```{r}
+renderPlotly({
+m <- subset(scot_data, doubling_time_week >0 & date == ymd("2020-03-23"))
+m$text <- "Lockdown"
+
+a <- list(
+  x = m$date,
+  y = m$doubling_time_week,
+  text = m$text,
+  xref = "x",
+  yref = "y",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 1,
+  ay = -50
+)
+
+plot_ly(data = subset(scot_data, doubling_time_week>0), x = ~date, y = ~doubling_time_week, type = "scatter", mode = "lines+markers", color = ~I("#297fe1"), 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Doubling time: %{y:.2f} days<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        title = ""), 
+        yaxis = list(title = "Doubling time over the past 7 days (in days)",
+                     tickformat = "digit",
+                     autorange='reversed'),
+        showlegend = FALSE) %>% 
+        add_markers() %>% 
+  layout(annotations = a)  %>%
+    partial_bundle()
+
+})
+```
+
+### Doubling time for the number of deaths over the past 7 days
+```{r}
+renderPlotly({
+  m <- subset(scot_deaths, doubling_time_week >0 & date == ymd("2020-03-23"))
+m$text <- "Lockdown"
+
+a <- list(
+  x = m$date,
+  y = m$doubling_time_week,
+  text = m$text,
+  xref = "x",
+  yref = "y",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 1,
+  ay = -25
+)
+
+  plot_ly(data = subset(scot_deaths, doubling_time_week>0), x = ~date, y = ~doubling_time_week, type = "scatter", mode = "lines+markers", color = ~I("#297fe1"), 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Doubling time: %{y:.2f} days<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        title = ""), 
+        yaxis = list(title = "Doubling time over the past 7 days (in days)",
+                     tickformat = "digit",
+                     autorange='reversed'),
+        showlegend = FALSE) %>% 
+        add_markers() %>% 
+  layout(annotations = a)  %>%
+    partial_bundle()
+})
+```
+
+Scotland / UK 
+=======================================================================
+Row
+-------------------------------------
+### Daily confirmed cases
+```{r}
+renderPlotly({
+  # ggplot(uk_scot_data %>% filter(date >= "2020-01-31"), aes(x = date, y = new_cases, fill = country_region)) +
+  # geom_col() +
+  # geom_hline(yintercept = 0, size = 1, colour = "#333333") +
+  #   scale_fill_manual(values = c("#297fe1", "red")) +
+  # scale_x_date(expand = c(0.005, 0.005), date_labels = "%d-%b") +
+  # scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
+  # labs(x = NULL, y = NULL, title = NULL, subtitle = NULL,
+  #      caption = "Source: github/watty62") +
+  # theme_minimal(base_size = 12) +
+  # theme(plot.margin = unit(rep(0.5, 4), "cm"),
+  #       panel.grid.major.x = element_blank(),
+  #       panel.grid.minor = element_blank(),
+  #       plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
+  #   facet_grid(.~country_region) +
+  # theme(legend.position = "none")
+  
+   uk_scot_data %>% 
+    filter(date >= "2020-01-31") %>%
+    plot_ly(
+        x = ~date,
+        y = ~new_cases,
+        color = ~country_region,
+        colors = c("#297fe1", "#b24b29"),
+        type = "bar",
+  hovertemplate = paste('Date: %{x}',
+                        '<br>New cases: %{y}<extra></extra> ')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", title = ""), 
+        yaxis = list(title = ""),
+        showlegend = FALSE) %>%
+    partial_bundle()
+
+})
+```
+
+### Cumulative confirmed cases 
+```{r}
+renderPlotly({
+  
+# ggplot(uk_scot_data %>% filter(date >= "2020-01-31"), aes(x = date, y = confirmed_cases, group = country_region,
+#                                   fill = country_region, colour = country_region)) +
+#   geom_line( size = 0.5) +
+#     geom_point(shape = 21, colour = "white", size = 2.5) +
+#     scale_fill_manual(values = c("#297fe1", "#b24b29")) +
+#     scale_colour_manual(values = c("#297fe1", "#b24b29")) +
+#   scale_y_continuous(labels = comma, expand = c(0.005, 0.005), sec.axis = sec_axis(~ ., breaks = max(scot_data$confirmed_cases))) +
+#   scale_x_date(expand = c(0.005, 0.1), date_labels = "%d-%b") +
+#   geom_hline(yintercept = 0, size = 0.5, colour = "#212121") +
+#   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL,
+#        caption = "Source: github/watty62") +
+#   theme_minimal(base_size = 12) +
+#   theme(plot.margin = unit(rep(0.5, 4), "cm"),
+#         panel.grid.major.x = element_blank(),
+#         panel.grid.minor = element_blank(),
+#         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
+#     expand_limits(y = c(0,max(uk_scot_data$confirmed_cases)*1.01)) +
+#   theme(legend.position = "none")
+
+
+plot_ly(data = uk_scot_data %>% filter(date >= "2020-01-31"), x = ~date, y = ~confirmed_cases, text = ~country_region, color = ~country_region, type = "scatter", mode = "lines+markers", colors = c("#297fe1", "#b24b29"), 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Total cases: %{y}',
+                        '<br>Region: %{text}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        #showgrid = F,
+        title = ""), 
+        yaxis = list(title = "",
+                     range=c(0,max(uk_scot_data$confirmed_cases)+5),
+                     tickformat = "digit"),
+        showlegend = FALSE) %>%
+    partial_bundle()
+
+})
+```
+
+Row
+-------------------------------------
+
+### Daily confirmed deaths
+```{r}
+renderPlotly({
+  #date of first uk death
+  # ggplot(uk_scot_data %>% filter(date >= "2020-03-06"), alpha = 0.5, aes(x = date, y = new_deaths, fill = country_region)) +
+  #   geom_hline(yintercept = 0, size = 1, colour = "#333333") +
+  #   geom_col() +
+  #   scale_fill_manual(values = c("#297fe1", "#b24b29")) +
+  #   scale_x_date(expand = c(0.005, 0.005), date_labels = "%d-%b") +
+  #   scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
+  #   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL, caption = "Source: github/watty62") +
+  #   theme_minimal(base_size = 12) +
+  #   theme(plot.margin = unit(rep(0.5, 4), "cm"),
+  #         panel.grid.major.x = element_blank(),
+  #         panel.grid.minor = element_blank(),
+  #         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
+  #   facet_grid(.~country_region) +
+  # theme(legend.position = "none")
+  
+  uk_scot_data %>% 
+    filter(date >= "2020-03-06") %>%
+    plot_ly(
+        x = ~date,
+        y = ~new_deaths,
+        color = ~country_region,
+        colors = c("#297fe1", "#b24b29"),
+        type = "bar",
+  hovertemplate = paste('Date: %{x}',
+                        '<br>New deaths: %{y}<extra></extra> ')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", title = ""), 
+        yaxis = list(title = ""),
+        showlegend = FALSE) %>%
+    partial_bundle()
+})
+```
+
+### Cumulative confirmed deaths
+```{r}
+renderPlotly({
+  #date of first uk death
+  # ggplot(uk_scot_data %>% filter(date >= "2020-03-06"), aes(x = date, y = deaths, group = country_region,
+  #                                 fill = country_region, colour = country_region)) +
+  #   geom_hline(yintercept = 0, size = 1, colour = "#333333") +
+  #   geom_line( size = 0.5) +
+  #   geom_point(shape = 21, colour = "white", size = 2.5) +
+  #   scale_fill_manual(values = c("#297fe1", "#b24b29")) +
+  #   scale_colour_manual(values = c("#297fe1", "#b24b29")) +
+  #   scale_x_date(expand = c(0.005, 0.1), date_labels = "%d-%b") +
+  #   scale_y_continuous(expand = c(0.005, 0.005), labels = comma) +
+  #   labs(x = NULL, y = NULL, title = NULL, subtitle = NULL, caption = "Source: github/watty62") +
+  #   theme_minimal(base_size = 12) +
+  #   theme(plot.margin = unit(rep(0.5, 4), "cm"),
+  #         panel.grid.major.x = element_blank(),
+  #         panel.grid.minor = element_blank(),
+  #         plot.caption = element_text(size = 10, color = "grey50", hjust = 1, margin = margin(t = 15))) +
+  #     expand_limits(y = c(0, max(uk_scot_data$deaths)*1.01)) +
+  # theme(legend.position = "none")
+  
+plot_ly(data = uk_scot_data %>% filter(date >= "2020-03-06"), x = ~date, y = ~deaths, text = ~country_region, color = ~country_region, type = "scatter", mode = "lines+markers", colors = c("#297fe1", "#b24b29"), 
+               hovertemplate = paste('Date: %{x}',
+                        '<br>Total deaths: %{y}',
+                        '<br>Region: %{text}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(xaxis = list(
+        type = 'date',
+        tickformat = "%d %B", 
+        title = ""), 
+        yaxis = list(title = "",
+                     range=c(0,max(uk_scot_data$deaths)+50),
+                     tickformat = "digit"),
+        showlegend = FALSE) %>%
+    partial_bundle()
+})
+```
+
+
+Global trajectories
+=======================================================================
+
+Row 
+-------------------------------------
+### <strong>Trajectories of COVID-19.</strong></br>This is a plot of new cases/deaths against total cases/deaths on a log-log scale to emphasise the exponential trajectiories of national outbreaks and highlight when these begin to slow down. 
+
+```{r}
+server <- function(input, output) {
+
+  dat <- dat_world %>%
+    filter(country_region != "United Kingdom") %>% 
+    bind_rows(dat_uk) %>%
+    filter(confirmed_cases >=10)
+  
+  cov_progress <- function(df,
+                         enddate,
+                         index = days,
+                         outcome = "deaths",
+                         group,
+                         smooth_by = 4,
+                         fill_colour = "white",
+                         highlight = NULL,
+                         xlim = 1, ylim = 1){
+  
+  outcome <- sym(outcome)
+  
+  df <- df %>% 
+    subset(date >= lubridate::ymd("2020-01-28") &  date <= enddate) %>%
+    filter(!is.na({{outcome}})) %>%   
+    group_by({{group}}) %>%
+    mutate(outcome = {{outcome}},
+           diffs = c(NA, diff({{outcome}})),
+              change = roll_sumr(diffs, n = smooth_by),
+              index = max({{index}})) %>% 
+    ungroup() %>% 
+    filter(!is.na(change))   
+  
+  
+  df <- df %>% 
+    group_by({{group}}) %>% 
+    mutate(label = if_else({{index}} == max({{index}}) & {{group}} %in% highlight,
+                           as.character({{group}}),
+                           NA_character_)) %>%
+    group_by({{group}})
+  
+  df_hi <- df %>% 
+    filter({{group}} %in% highlight)
+  
+  breaks = sort(outer(c(1,3), c(1, 10, 100, 1000, 10000, 100000)))
+  
+  ggplot(df) +
+    aes(x = outcome, y = change, group = {{group}}) +
+    geom_line(col= "grey93") +
+    geom_line(data = df_hi, lwd = 1.5, aes(colour = {{group}})) +
+    geom_point(data = df_hi, aes(colour = {{group}})) +
+    scale_x_continuous(trans = "log10",
+                       labels = scales::comma_format(),
+                       breaks = breaks,
+                       expand = expansion(mult = 0.1)) +
+    scale_y_continuous(trans = "log10",
+                       labels = scales::comma_format(),
+                       breaks = breaks,
+                       expand = expansion(mult = 0.1)) +
+    geom_label_repel(aes(label = label, colour = {{group}}),
+                     na.rm = TRUE, size = 5,
+                     fill = fill_colour,
+                     segment.color = NA) +
+    coord_cartesian(xlim  = c(xlim, NA), ylim = c(ylim, NA)) +
+    guides(x = guide_axis(check.overlap = TRUE), y = guide_axis(check.overlap = TRUE)) +
+    theme(legend.position = "none") +
+    labs(y = str_glue("New confirmed {outcome} \n(in the past {smooth_by} days)"),
+         #x = as_label(enquo(outcome)),
+         x = str_glue("Total {outcome}"),
+         title = str_glue("Trajectory of COVID-19 {outcome} vs current total"),
+         subtitle = str_glue("Date: {enddate}"))
+}
+
+  
+  output$loglogplot <- renderPlot({
+    dat %>%
+    cov_progress(
+      enddate = input$DatesSlider,
+      index = as.numeric(date),
+      outcome = input$type,
+      group = country_region,
+      smooth_by = input$smooth,
+      highlight = input$countries,
+      xlim = input$xlim, ylim = input$ylim
+    ) +
+      theme_classic(base_size = 18) +
+      theme(legend.position = "none")
+      
+  })
+
+
+
+  possible_countries <- sort(unique(dat$country_region))
+
+  output$cboxes <- renderUI({
+    selectizeInput(
+      inputId = "countries",
+      label = "Choose countries (autocompletes + can click and delete)",
+      choices = possible_countries,
+      selected = c("Scotland", "UK", "Italy", "France", "Spain", "US", "Korea, South", "Diamond Princess", "China"),
+      multiple = TRUE
+    )
+  })
+  
+}
+
+
+
+ui <- fluidPage(
+  theme = shinytheme("superhero"),
+  h3(""),
+  sidebarLayout(
+    sidebarPanel(uiOutput("cboxes"),
+    sliderInput("smooth", label = "Smooth over X number of days",
+                min = 1, max = 7,
+                value = 7, step = 1),
+    radioButtons("type", "Choose outcome measure",
+                 choices = c("confirmed_cases", "deaths"),
+                 selected = "confirmed_cases"),
+    sliderInput("DatesSlider",
+                "Date range",
+                min = lubridate::ymd("2020-02-25"),
+                max = Sys.Date(),
+                value=Sys.Date(),
+                timeFormat="%Y-%m-%d"), 
+    
+    splitLayout(cellWidths = c("50%", "50%"),
+                cellArgs = list(style = "padding: 20px"),
+    numericInput("xlim", label = "x-axis lower limit",
+                 min = 1, max = 1000, value = 10),
+    numericInput("ylim", label = "y-axis lower limit",
+                 min = 1, max = 1000, value = 1)),width = 3),
+    mainPanel(width = 9,
+      plotOutput("loglogplot", height = "100%"),
+      tags$head(tags$style("#loglogplot{height:80vh !important;}"))
+    ),
+  )
+)
+
+shinyApp(ui = ui, server = server)
+```
+
+Static plots UK {data-navmenu="Static plots"}
+=======================================================================
+
+Row {data-height=900}
+-------------------------------------
+
+### UK cases by region
+```{r, eval = TRUE}
+uk_cases_plot = reactive({
+  ref <- 10
+lockdown_date <- ymd("2020-03-23")
+ian_fill <- "#DFDCD3"
+
+ts_cases <- dat_uk %>% 
+  rename(cases = confirmed_cases) %>% 
+  mutate(date = lubridate::ymd(date)) %>% 
+  select(- deaths, date, country_region, cases) %>% 
+  group_by(country_region) %>% 
+  nest() %>% 
+  mutate(offset = map(data, cov_offset, ref = ref, var = cases)) %>% 
+  unnest(offset) %>% 
+  select(-data) %>%
+  mutate(lockdown = date == lockdown_date)
+
+ts_cases %>% 
+  cov_trajplot(index = days, outcome = cases,
+               group = country_region, fill_colour = ian_fill) +
+  labs(title = str_glue("Covid19 cases in UK by Country as of {format(max(ts_cases$date), '%d %B %Y')}"),
+       subtitle = "data from: https://github.com/tomwhite",
+       x = str_glue("Days since {ref}th case"),
+       y = "Cumulative cases") +
+  theme_bw(base_size = 18) +
+  theme(legend.position = "none",
+        plot.background = element_rect(fill = ian_fill),
+        panel.background = element_rect(fill = ian_fill),
+        panel.grid.minor = element_line(colour = NA),
+        panel.grid.major = element_line(colour = "grey50",
+                                        linetype = "solid",
+                                        size = 0.25))
+})
+renderPlot({
+ ggsave("covid19_uk_regions_cases.pdf", uk_cases_plot())
+ uk_cases_plot()
+})
+```
+
+
+
+### UK deaths by region
+
+```{r, eval = TRUE}
+uk_deaths_plot = reactive({
+  ref <- 10
+lockdown_date <- ymd("2020-03-23")
+ian_fill <- "#DFDCD3"
+
+ts_deaths <- dat_uk %>% 
+  mutate(date = lubridate::ymd(date)) %>% 
+  select(deaths, date, country_region, -confirmed_cases) %>% 
+  group_by(country_region) %>% 
+  nest() %>% 
+  mutate(offset = map(data, cov_offset, ref = ref, var = deaths)) %>% 
+  unnest(offset) %>% 
+  select(-data) %>%
+  mutate(lockdown = date == lockdown_date)
+
+ts_deaths %>% 
+  cov_trajplot(index = days, outcome = deaths,
+               group = country_region,
+               fill_colour = ian_fill) +
+  labs(title = str_glue("Covid19 deaths in UK by Region as of {format(max(ts_deaths$date), '%d %B %Y')}"),
+       subtitle = "data from: https://github.com/tomwhite",
+       x = str_glue("Days since {ref}th death"),
+       y = "Cumulative deaths (on log scale)",
+       colour = "Region") +
+  theme_bw(base_size = 18) +
+  theme(legend.position = "none",
+        plot.background = element_rect(fill = ian_fill),
+        panel.background = element_rect(fill = ian_fill),
+        panel.grid.minor = element_line(colour = NA),
+        panel.grid.major = element_line(colour = "grey50",
+                                        linetype = "solid",
+                                        size = 0.25))
+})
+
+renderPlot({
+ ggsave("covid19_uk_regions_deaths.pdf", uk_deaths_plot())
+ uk_deaths_plot()
+})
+```
+
+Row {data-height=100}
+-------------------------------------
+### 
+```{r}
+downloadHandler(
+    filename = function() {
+        "covid19_uk_regions_cases.pdf"
+    },
+    content = function(file) {
+        file.copy("covid19_uk_regions_cases.pdf", file, overwrite=TRUE)
+    }
+)
+```
+
+###
+```{r}
+downloadHandler(
+    filename = function() {
+        "covid19_uk_regions_deaths.pdf"
+    },
+    content = function(file) {
+        file.copy("covid19_uk_regions_deaths.pdf", file, overwrite=TRUE)
+    }
+)
+```
+
+Static plots Scotland {data-navmenu="Static plots"}
+=============================================================
+Row {data-height=950}
+-------------------------------------
+### Scotland cases by health board
+```{r}
+hb_cases = reactive({
+ian_fill <- "#DFDCD3"
+lockdown_date <- ymd("2020-03-23")
+
+ref <- 10
+
+ts <- scot_data_raw %>% 
+  pivot_longer(`Ayrshire and Arran`:`Grand Total`,
+               names_to = "health_board",
+               values_to = "cases") %>% 
+  mutate(health_board = fct_relevel(health_board, "Grand Total", after = Inf)) %>% 
+  mutate(date = lubridate::dmy(Date)) %>% 
+  select(-Date, date, health_board, cases) %>% 
+  group_by(health_board) %>% 
+  nest() %>% 
+  mutate(offset = map(data, cov_offset, ref = ref, var = cases)) %>% 
+  unnest(offset) %>% 
+  select(-data) %>% 
+  mutate(lockdown = date == lockdown_date)
+
+
+cov_trajplot(ts, days, cases,
+             group = health_board,
+             flag = lockdown) +
+  labs(title = str_glue("Covid19 cases in Scotland by health board as of {format(max(ts$date), '%d %B %Y')}"),
+       subtitle = "data from: https://github.com/watty62",
+       x = str_glue("Days since {ref}th case"),
+       y = "Cumulative cases") +
+  theme_bw(base_size = 18) +
+  theme(legend.position = "none",
+        plot.background = element_rect(fill = ian_fill),
+        panel.background = element_rect(fill = ian_fill),
+        panel.grid.minor = element_line(colour = NA),
+        panel.grid.major = element_line(colour = "grey50",
+                                          linetype = "solid",
+                                          size = 0.25))
+})
+renderPlot({
+ ggsave("covid19_scot_hb_cases.pdf", hb_cases())
+ hb_cases()
+})
+```
+
+Row {data-height=50}
+-------------------------------------
+```{r}
+downloadHandler(
+    filename = function() {
+        "covid19_scot_hb_cases.pdf"
+    },
+    content = function(file) {
+        file.copy("covid19_scot_hb_cases.pdf", file, overwrite=TRUE)
+    }
+)
+```
+
+
+
+
+About {data-icon="fa-info-circle"} 
+=======================================================================
+**Disclaimer** </br>
+This visualisation of the Scottish and United Kingdom data is based on the data available from colleagues who have been monitoring the numbers and are not official numbers. Therefore these plots should not be used for official decision making but rather are there to help the general population of the UK and particularly Scotland understand how this epidemic is unfolding and the importance of social distancing to help slow its spread.
+
+\*In the UK the number of cases is misleading at it reflects the number of people tested with symptoms who were positive i.e. confirmed cases. It is still not clear how widespread transmission has been and until serological testing is done it is not possible to know this.
+
+We have used logarithmic scales for the case and death trajectories to make it clear to see the doubling rates different populations are following.
+
+### Data sources 
+
+1. **UK Data (Cases)** https://www.arcgis.com/sharing/rest/content/items/e5fd11150d274bebaaf8fe2a7a2bda11/data
+2. **UK Data (Deaths)** https://github.com/traffordDataLab/covid-19/raw/master/data/daily_deaths.csv
+3. **UK Regional data**
+https://github.com/tomwhite/covid-19-uk-data/tree/master/data </br>
+Data for England is based on UK data minus Scotland, NI, and Wales data. 
+4. **Scottish Data ** https://github.com/watty62/Scot_covid19/blob/master/data/processed/regional_cases.csv
+5. **Maps (Scotland)** https://data.gov.uk/dataset/27d0fe5f-79bb-4116-aec9-a8e565ff756a/nhs-health-boards
+6. **Maps (UK)** https://gadm.org/
+7. **World data** https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/ and https://covid.ourworldindata.org/data/ecdc/full_data.csv
+<!-- 7. **Thumbnail** https://www.newscientist.com/term/covid-19/ -->
+ 
+### Credits
+This site and data visualisation was prepared by members of the Epidemiology, Economics and Risk Assessment (<a href="https://www.ed.ac.uk/roslin/eeragroup" target="_blank">EERA</a>) Group at the University of Edinburgh, the Royal Dick School of Veterinary Studies (R(D)SVS). Please email us at mark.bronsvoort@roslin.ed.ac.uk with any questions or comments. 
+
+This application was built using the R Shiny package based on code adapted from  https://trafforddatalab.shinyapps.io/covid-19/#section-cases. Scottish data was put together by github/watty62, while UK death data was published by Public Health England and put together by github.com/traffordDataLab. Trajectory plots inspired by https://www.ft.com/coronavirus-latest?fbclid=IwAR0GrC7Q5Tl1W_XAEhkm_EbplUNvZ827D5L0_rZWI1jKzqeY2d_EHMJ5GDA and https://aatishb.com/covidtrends/

@@ -3,7 +3,10 @@ path <- "/Users/smazeri/Documents/GitHub/covid19_scotland/"
 
 
 # Load packages
-library(flexdashboard) ; library(shiny) ; library(readr); library(dplyr); library(tidyr); library(purrr); library(forcats); library(stringr); library(htmlwidgets); library(lubridate); library(sf); library(RcppRoll); library(plotly); library(shinythemes);library(leaflet); library(classInt); library(ggrepel); library(scales); library(leaflet.extras);library(viridis)
+library(flexdashboard) ; library(shiny) ; library(readr); library(dplyr); library(tidyr); library(purrr); 
+library(forcats); library(stringr); library(htmlwidgets); library(lubridate); library(sf); library(RcppRoll); 
+library(plotly); library(shinythemes);library(leaflet); library(classInt); library(ggrepel); library(scales);
+library(leaflet.extras);library(viridis)
 library(httr); library(readxl)
 #library(tidyverse) ; library(httr) ;  ; library(readxl) ; library(DT) ; #library(rvest); #library(htmltools) ;  library(xml2);
 #library(RColorBrewer); 
@@ -111,19 +114,63 @@ scot_tests_long <- scot_tests %>%
                                 "Today Positive" = "Positive"), levels = c("Positive", "Negative")))
 
 
+#Overall deaths 
+myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-14.xlsx"
+GET(myurl_deaths, write_disk(tmp <- tempfile(fileext = ".xlsx")))
+nrs_deaths_covid_raw <- read_excel(tmp, sheet = "Table 1 - COVID deaths", skip = 3) %>%
+  select(-`Year to Date`) %>%
+  rename("Details" = "...2",
+         "Total" = "...18")
+nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths involving COVID-194") %>%
+  pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
+               names_to = "week_beginning", 
+               values_to = "weekly_deaths_total") %>%
+  mutate(week_beginning = janitor::excel_numeric_to_date(parse_number(week_beginning))) %>%
+  mutate(Type = "Covid19 deaths") %>%
+  select(week_beginning, weekly_deaths_total, Type)
+
+nrs_deaths_all <- read_excel(tmp, sheet = "Table 2 - All deaths", skip = 3) %>% 
+  select(-`...17`) %>%
+  rename("Details" = "...2",
+         "Total" = "...18") %>%
+  filter(`Week beginning` %in% c("Total deaths from all causes", "Total deaths: average of corresponding")) %>%
+  pivot_longer(cols = `43829`:names(.)[ncol(.)-1],
+               names_to = "week_beginning", 
+               values_to = "weekly_deaths_total") %>%
+  mutate(week_beginning = janitor::excel_numeric_to_date(parse_number(week_beginning))) %>%
+  mutate(Type = recode(`Week beginning`, "Total deaths from all causes" = "All causes - 2020",
+                       "Total deaths: average of corresponding" = "All causes - 5 year average")) %>%
+  select(week_beginning, weekly_deaths_total, Type)
+
+nrs_deaths_comparison <- bind_rows(nrs_deaths_covid, nrs_deaths_all)
+
+nrs_deaths_healthboards_total <- nrs_deaths_covid_raw %>%
+                          filter(Details %in% scot_data_health_board_total$health_board) %>%
+  pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
+               names_to = "week_beginning", 
+               values_to = "weekly_deaths_total") %>%
+  mutate(week_beginning = janitor::excel_numeric_to_date(parse_number(week_beginning))) %>%
+  mutate(Type = "Covid19 deaths") %>%
+  distinct(Details, .keep_all = TRUE) %>%
+  rename("Deaths" = Total, 
+         "health_board" = Details)
+
 # Map files
 # SCOTLAND MAP
 cases_by_area <- sf::st_read(paste0(path,"SG_NHS_HealthBoards_2019c.geojson")) %>%
+  #rmapshaper::ms_simplify(keep = 0.15) %>%
   st_transform(crs = st_crs("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")) %>%
   left_join(scot_data_health_board_total, by = c("HBName" = "health_board")) %>%
-  left_join(scot_pop, by = c("HBName" = "Name")) 
+  left_join(scot_pop, by = c("HBName" = "Name")) %>%
+  left_join(select(nrs_deaths_healthboards_total, health_board, Deaths), by = c("HBName" = "health_board"))
 
-cases_by_area <- cbind(cases_by_area, st_coordinates(st_centroid(cases_by_area)))
-
+#cases_by_area <- cbind(cases_by_area, st_coordinates(st_centroid(cases_by_area)))
 cases_by_area$cases_popup <- paste(cases_by_area$HBName, cases_by_area$CasesSum, "cases", sep = " ")
-
 cases_by_area$CasesRate <- 10000* cases_by_area$CasesSum/cases_by_area$Population
+cases_by_area$DeathsRate <- 10000* cases_by_area$Deaths/cases_by_area$Population
 cases_by_area$cases_popup_pop <- paste(cases_by_area$HBName, round(cases_by_area$CasesRate,2), "cases per 10,000 population", sep = " ")
+cases_by_area$deaths_popup <- paste(cases_by_area$HBName, cases_by_area$Deaths, "cases", sep = " ")
+cases_by_area$deaths_popup_pop <- paste(cases_by_area$HBName, round(cases_by_area$DeathsRate,2), "deaths per 10,000 population", sep = " ")
 
 ## Covid daily hospital data
 myurl <- "https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/04/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/documents/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/govscot%3Adocument/Data%2BTable%2B%252810-04-2020%2529.xlsx?forceDownload=true"
@@ -161,6 +208,8 @@ data_hosp_hosp <- data_hosp %>%
                            "Hospital_suspected" = "Suspected")) %>%
   mutate(Patients = factor(Patients, levels = c("Confirmed/Suspected", "Confirmed", "Suspected")))
 
+
+
 # Covid death demographics
 myurl2 <- "https://statistics.gov.scot/downloads/cube-table?uri=http%3A%2F%2Fstatistics.gov.scot%2Fdata%2Fdeaths-involving-coronavirus-covid-19"
 covid_deaths<- read_csv(myurl2)
@@ -194,7 +243,7 @@ save(cases_by_area,cov_globaldata,cov_offset, cov_trajplot, cov_ukdata,
      ref, 
      scot_cases, scot_data, scot_data_all, scot_data_health_board, scot_data_health_board_total,
      scot_data_raw, scot_deaths, scot_pop,  scot_tests, scot_tests_long, uk_scot_data, 
-     scot_agesex, covid_deaths_2020_pop,
+     scot_agesex, covid_deaths_2020_pop, nrs_deaths_comparison,
      file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
 #rm(list = ls())
 #load("app_all.RData")

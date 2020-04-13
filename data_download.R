@@ -93,3 +93,21 @@ cov_ukdata <- function() {
                   values_to = "value") %>% 
      pivot_wider(names_from = type, values_from = value)
 }
+
+# from https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland
+cov_demography <- function() {
+  ONSFILE <- "ukmidyearestimates20182019ladcodes.xls"
+  demog <- map_df(set_names(c("MYE2 - Males", "MYE2 - Females")),
+                  readxl::read_excel,
+                  path = ONSFILE,
+                  skip = 4,
+                  .id = "gender"
+  ) %>%
+    filter(Name == "SCOTLAND") %>%
+    select(gender, `0`:`90`) %>% 
+    pivot_longer(`0`:`90`, names_to = "age", values_to = "count") %>% 
+    mutate(gender = str_extract(gender, "(Male|Female)"),
+           age = parse_integer(age))
+  
+  demog
+}

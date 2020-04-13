@@ -1,5 +1,5 @@
 rm(list = ls())
-path <- "/Users/smazeri/Documents/GitHub/covid/"
+path <- "/Users/smazeri/Documents/GitHub/covid19_scotland/"
 
 
 # Load packages
@@ -10,9 +10,9 @@ library(httr); library(readxl)
 #library(ggsci);  
 
 # Functions for uk and world data download
-source(paste0(path,"R/data_download.R"))
+source(paste0(path,"data_download.R"))
 # Functions for log date trajectories plots
-source(paste0(path, "R/log_time_traj.R"))
+source(paste0(path, "log_time_traj.R"))
 
 # Import UK and world data
 dat_world <- cov_globaldata() 
@@ -122,8 +122,8 @@ cases_by_area <- cbind(cases_by_area, st_coordinates(st_centroid(cases_by_area))
 
 cases_by_area$cases_popup <- paste(cases_by_area$HBName, cases_by_area$CasesSum, "cases", sep = " ")
 
-cases_by_area$CasesRate <- 100000* cases_by_area$CasesSum/cases_by_area$Population
-cases_by_area$cases_popup_pop <- paste(cases_by_area$HBName, round(cases_by_area$CasesRate,2), "cases per 100,000 population", sep = " ")
+cases_by_area$CasesRate <- 10000* cases_by_area$CasesSum/cases_by_area$Population
+cases_by_area$cases_popup_pop <- paste(cases_by_area$HBName, round(cases_by_area$CasesRate,2), "cases per 10,000 population", sep = " ")
 
 ## Covid daily hospital data
 myurl <- "https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/04/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/documents/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/govscot%3Adocument/Data%2BTable%2B%252810-04-2020%2529.xlsx?forceDownload=true"
@@ -168,13 +168,34 @@ last_week <- lubridate::ymd(str_remove(covid_deaths$DateCode, "w/c ")) %>% max(n
 covid_deaths_2020 <-subset(covid_deaths, DateCode == "2020" & `Cause Of Death` == "COVID-19 related" & Sex != "All" & Age != "All") %>% arrange(Age, Sex)
 
 
+# Align covid_deaths_2020 and scotland demography
+scot_agesex <- cov_demography()
+
+covid_deaths_2020_pop <- covid_deaths_2020 %>% 
+  mutate(Age = str_remove(Age, " years$"),
+         Age = case_when(Age == 0                   ~ "0-0.999",
+                         Age == "85 years and over" ~ "86-90",
+                         TRUE                       ~ Age)) %>% 
+  separate(Age, into = c("age_from", "age_to"), sep = "-", remove = FALSE) %>%
+  mutate_at(c("age_from", "age_to"), parse_double) %>% 
+  left_join(scot_agesex, by = c("Sex" = "gender")) %>% 
+  filter(age >= age_from & age <= age_to) %>% 
+  arrange(Sex, Age, age) %>% 
+  group_by(Sex, Age) %>% 
+  summarise(population = sum(count, na.rm = TRUE),
+            deaths = unique(Value)) %>% 
+  ungroup() %>% 
+  mutate(Age = if_else(Age == "0-0.999", "0-1", Age))
+
 #save.image(file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
 save(cases_by_area,cov_globaldata,cov_offset, cov_trajplot, cov_ukdata,
      covid_deaths_2020, dat_uk, dat_uk_total, dat_world, data_hosp_hosp, 
      data_hosp_icu, last_week, 
      ref, 
      scot_cases, scot_data, scot_data_all, scot_data_health_board, scot_data_health_board_total,
-     scot_data_raw, scot_deaths, scot_pop,  scot_tests, scot_tests_long, uk_scot_data, file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
+     scot_data_raw, scot_deaths, scot_pop,  scot_tests, scot_tests_long, uk_scot_data, 
+     scot_agesex, covid_deaths_2020_pop,
+     file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
 #rm(list = ls())
 #load("app_all.RData")
 

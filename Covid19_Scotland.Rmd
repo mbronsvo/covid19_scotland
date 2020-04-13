@@ -479,6 +479,29 @@ renderPlotly({
 })
 ```
 
+### Scotland Covid-19 related deaths by 10,000 population
+```{r}
+renderPlotly({
+ plot_ly(covid_deaths_2020_pop, x = ~Age, y = ~(deaths/population * 10000),
+         type = 'bar',
+         color = ~Sex,
+         text = ~Sex,
+         colors = viridis(3)[c(1,2)],
+         hovertemplate = paste('Age group: %{x}',
+                               '<br>Gender: %{text}',
+                              '<br>Number: %{y:.2f}<extra></extra>')) %>%
+         plotly::config(displayModeBar = FALSE)  %>%
+         layout(xaxis = list(
+                #showgrid = F,
+                title = ""), 
+                yaxis = list(title = "Deaths per 10,0000 population",
+                tickformat = "digit"),
+                legend = list(x = 0.1, y = 0.9)
+                 )  %>%
+    partial_bundle()
+    
+})
+```
 
 Doubling{data-icon="fa-clock-o" data-navmenu="Scotland"}
 =======================================================================
@@ -1016,6 +1039,7 @@ Row {data-height=400}
 3. [**UK Regional data**](https://github.com/tomwhite/covid-19-uk-data/tree/master/data) Note: Data for England is based on UK data minus Scotland, NI, and Wales data. 
 4. [**Scottish Data**](https://github.com/watty62/Scot_covid19/blob/master/data/processed)
 5. [**Scottish Deaths Demographics**](https://statistics.gov.scot/slice?dataset=http%3A%2F%2Fstatistics.gov.scot%2Fdata%2Fdeaths-involving-coronavirus-covid-19)
+5. [**Scottish Population Demographics**](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland)
 6. [**Scottish hospital cases data**](https://www.gov.scot/publications/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/)
 7. [**Maps (Scotland)**](https://data.gov.uk/dataset/27d0fe5f-79bb-4116-aec9-a8e565ff756a/nhs-health-boards)
 8. [**Maps (UK)**](https://gadm.org/)

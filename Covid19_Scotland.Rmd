@@ -273,25 +273,37 @@ w %>%
 
 
 ### Confirmed cases by Health Board in Scotland
-```{r}
+```{r, warning=FALSE, message=FALSE, comment=FALSE}
 renderLeaflet({
   breaks <- classIntervals(cases_by_area$CasesSum, n = 4, style = "jenks")$brks
   pal <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
-    breaks <- classIntervals(cases_by_area$CasesRate, n = 4, style = "jenks")$brks
+  breaks <- classIntervals(cases_by_area$CasesRate, n = 4, style = "jenks")$brks
   pal2 <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
+  breaks <- classIntervals(cases_by_area$Deaths, n = 4, style = "jenks")$brks
+  pal3 <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
+  breaks <- classIntervals(cases_by_area$DeathsRate, n = 4, style = "jenks")$brks
+  pal4 <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
   
-  leaflet(data = filter(cases_by_area, CasesSum != 0)) %>%
+  leaflet(data = rmapshaper::ms_simplify(cases_by_area, keep = 0.15)) %>%
     #setView(-3, 54.3, zoom = 5) %>% 
+    setView(-3, 57.9 , zoom = 6) %>% 
     addTiles(urlTemplate = "", attribution = 'Copyright Scottish Government, contains Ordnance Survey data © Crown copyright and database right (2019) | Data: github/watty62', options = providerTileOptions(minZoom = 5, maxZoom = 9)) %>%
 addPolygons(fillColor = ~pal(CasesSum), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~cases_popup, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2, bringToFront = TRUE), group = "Numbers") %>% 
-    addPolygons(fillColor = ~pal2(CasesRate), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~cases_popup_pop, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2), group ="Rate") %>%
-    addLegend(pal = pal, values = ~CasesSum, opacity = 0.7, title = "Cases", position = "bottomright", group = "Numbers") %>% 
-    addLegend(pal = pal2, values = ~CasesRate, opacity = 0.7, title = "Rate", position = "bottomright", group = "Rate") %>% 
-      addLayersControl(
-    #baseGroups = c("Numbers", "Rate"),
-    overlayGroups = c("Numbers", "Rate"),
+
+addPolygons(fillColor = ~pal2(CasesRate), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~cases_popup_pop, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2), group ="Cases-Rate") %>%
+
+addPolygons(fillColor = ~pal3(Deaths), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~deaths_popup, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2), group ="Deaths") %>%
+
+addPolygons(fillColor = ~pal4(DeathsRate), fillOpacity = 0.8, smoothFactor = 0.5, stroke = TRUE, weight = 1, color = "#bdbdbd", opacity = 1, label = ~deaths_popup_pop, labelOptions = labelOptions(style = list("font-weight" = "normal", padding = "3px 8px"), textsize = "15px", direction = "auto"), highlightOptions = highlightOptions(color = "white", weight = 2), group ="Deaths-Rate") %>%
+addLegend(pal = pal, values = ~CasesSum, opacity = 0.7, title = "Cases", position = "bottomright", group = "Numbers") %>% 
+addLegend(pal = pal2, values = ~CasesRate, opacity = 0.7, title = "Cases-Rate", position = "bottomright", group = "Cases-Rate") %>% 
+addLegend(pal = pal3, values = ~Deaths, opacity = 0.7, title = "Deaths", position = "bottomright", group = "Deaths") %>% 
+addLegend(pal = pal4, values = ~DeathsRate, opacity = 0.7, title = "Deaths-Rate", position = "bottomright", group = "Deaths-Rate") %>% 
+addLayersControl(
+#baseGroups = c("Numbers", "Rate"),
+    overlayGroups = c("Numbers", "Cases-Rate", "Deaths", "Deaths-Rate"),
     options = layersControlOptions(collapsed = FALSE)) %>%
-    hideGroup("Rate") %>%
+    hideGroup(c("Cases-Rate", "Deaths", "Deaths-Rate")) %>%
     addFullscreenControl() %>% 
     addResetMapButton() %>% 
     onRender(
@@ -299,6 +311,7 @@ addPolygons(fillColor = ~pal(CasesSum), fillOpacity = 0.8, smoothFactor = 0.5, s
       paste0("function(el, x) {$('head').append(","\'\'",");}"))
 })
 ```
+
 
 Deaths {data-navmenu="Scotland"}
 =======================================================================
@@ -472,7 +485,7 @@ renderPlotly({
                 title = ""), 
                 yaxis = list(title = "",
                 tickformat = "digit"),
-                legend = list(x = 0.1, y = 0.9)
+                legend = list(x = 0.1, y = 0.87)
                  )  %>%
     partial_bundle()
     
@@ -496,10 +509,40 @@ renderPlotly({
                 title = ""), 
                 yaxis = list(title = "Deaths per 10,0000 population",
                 tickformat = "digit"),
-                legend = list(x = 0.1, y = 0.9)
+                legend = list(x = 0.1, y = 0.87)
                  )  %>%
     partial_bundle()
     
+})
+```
+
+
+Deaths 5 year comparison {data-navmenu="Scotland"}
+=======================================================================
+Row
+-------------------------------------
+
+### Scotland weekly deaths data upto week commencing `r last_week` 
+
+```{r}
+renderPlotly({
+  plot_ly(data = nrs_deaths_comparison, x = ~week_beginning, y = ~weekly_deaths_total, 
+          text = ~Type, color = ~Type, type = "scatter", mode = "lines+markers", colors = viridis(3), 
+          hovertemplate = paste('Week beginning: %{x}',
+                                '<br>Number of deaths: %{y}',
+                                '<br>Type: %{text}<extra></extra>')) %>%
+    plotly::config(displayModeBar = FALSE)  %>%
+    layout(xaxis = list(
+      type = 'date',
+      tickformat = "%d %B", 
+      #showgrid = F,
+      title = ""), 
+      yaxis = list(title = "",
+                   range=c(0,max(nrs_deaths_comparison$weekly_deaths_total)+500),
+                   tickformat = "digit"),
+      legend = list(x = 0.1, y = 0.95)
+      ) %>%
+    partial_bundle()
 })
 ```
 

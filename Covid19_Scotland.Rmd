@@ -527,7 +527,7 @@ Row
 ```{r}
 renderPlotly({
   plot_ly(data = nrs_deaths_comparison, x = ~week_beginning, y = ~weekly_deaths_total, 
-          text = ~Type, color = ~Type, type = "scatter", mode = "lines+markers", colors = viridis(3), 
+          text = ~Type, color = ~Type, type = "scatter", mode = "lines+markers", colors = viridis(5)[c(1,2,3)], 
           hovertemplate = paste('Week beginning: %{x}',
                                 '<br>Number of deaths: %{y}',
                                 '<br>Type: %{text}<extra></extra>')) %>%
@@ -1080,13 +1080,14 @@ Row {data-height=400}
 1. [**UK Data (Cases)**](https://www.arcgis.com/sharing/rest/content/items/e5fd11150d274bebaaf8fe2a7a2bda11/data)
 2. [**UK Data (Deaths)**](https://github.com/traffordDataLab/covid-19/raw/master/data/daily_deaths.csv)
 3. [**UK Regional data**](https://github.com/tomwhite/covid-19-uk-data/tree/master/data) Note: Data for England is based on UK data minus Scotland, NI, and Wales data. 
-4. [**Scottish Data**](https://github.com/watty62/Scot_covid19/blob/master/data/processed)
+4. [**Scottish Daily Data**](https://github.com/watty62/Scot_covid19/blob/master/data/processed)
 5. [**Scottish Deaths Demographics**](https://statistics.gov.scot/slice?dataset=http%3A%2F%2Fstatistics.gov.scot%2Fdata%2Fdeaths-involving-coronavirus-covid-19)
 5. [**Scottish Population Demographics**](https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland)
-6. [**Scottish hospital cases data**](https://www.gov.scot/publications/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/)
-7. [**Maps (Scotland)**](https://data.gov.uk/dataset/27d0fe5f-79bb-4116-aec9-a8e565ff756a/nhs-health-boards)
-8. [**Maps (UK)**](https://gadm.org/)
-9. [**World data**](https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/ and https://covid.ourworldindata.org/data/ecdc/full_data.csv)
+6. [**Scottish Historic Deaths Data**](https://www.nrscotland.gov.uk/covid19stats)
+7. [**Scottish hospital cases data**](https://www.gov.scot/publications/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/)
+8. [**Maps (Scotland)**](https://data.gov.uk/dataset/27d0fe5f-79bb-4116-aec9-a8e565ff756a/nhs-health-boards)
+9. [**Maps (UK)**](https://gadm.org/)
+10. [**World data**](https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/ and https://covid.ourworldindata.org/data/ecdc/full_data.csv)
  
 Row {data-height=300}
 -----------------------------------------------------------------------

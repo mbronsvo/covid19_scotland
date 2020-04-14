@@ -96,7 +96,7 @@ cov_ukdata <- function() {
 
 # from https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland
 cov_demography <- function() {
-  ONSFILE <- "ukmidyearestimates20182019ladcodes.xls"
+  ONSFILE <- "/Users/smazeri/Documents/GitHub/covid19_scotland/ukmidyearestimates20182019ladcodes.xls"
   demog <- map_df(set_names(c("MYE2 - Males", "MYE2 - Females")),
                   readxl::read_excel,
                   path = ONSFILE,

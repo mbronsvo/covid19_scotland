@@ -273,15 +273,17 @@ w %>%
 
 
 ### Confirmed cases by Health Board in Scotland
-```{r, warning=FALSE, message=FALSE, comment=FALSE}
+```{r}
 renderLeaflet({
   breaks <- classIntervals(cases_by_area$CasesSum, n = 4, style = "jenks")$brks
   pal <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
   breaks <- classIntervals(cases_by_area$CasesRate, n = 4, style = "jenks")$brks
+  breaks <- c(breaks[1]-0.01, breaks[2:5])
   pal2 <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
   breaks <- classIntervals(cases_by_area$Deaths, n = 4, style = "jenks")$brks
   pal3 <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
   breaks <- classIntervals(cases_by_area$DeathsRate, n = 4, style = "jenks")$brks
+  breaks <- c(breaks[1:4], breaks[5]+0.01)[-1]
   pal4 <- colorBin(palette = "Blues", domain = NULL, bins = breaks, na.color = "#FFFFFF")
   
   leaflet(data = rmapshaper::ms_simplify(cases_by_area, keep = 0.15)) %>%
@@ -482,7 +484,7 @@ renderPlotly({
          plotly::config(displayModeBar = FALSE)  %>%
          layout(xaxis = list(
                 #showgrid = F,
-                title = ""), 
+                title = "Age (years)"), 
                 yaxis = list(title = "",
                 tickformat = "digit"),
                 legend = list(x = 0.1, y = 0.87)
@@ -506,7 +508,7 @@ renderPlotly({
          plotly::config(displayModeBar = FALSE)  %>%
          layout(xaxis = list(
                 #showgrid = F,
-                title = ""), 
+                title = "Age (years)"), 
                 yaxis = list(title = "Deaths per 10,0000 population",
                 tickformat = "digit"),
                 legend = list(x = 0.1, y = 0.87)
@@ -858,7 +860,7 @@ ui <- fluidPage(
                  selected = "confirmed_cases"),
     sliderInput("DatesSlider",
                 "Date range",
-                min = lubridate::ymd("2020-02-25"),
+                min = lubridate::ymd("2020-01-28"),
                 max = Sys.Date(),
                 value=Sys.Date(),
                 timeFormat="%Y-%m-%d"), 

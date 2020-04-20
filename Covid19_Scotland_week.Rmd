@@ -897,7 +897,7 @@ server <- function(input, output) {
     bind_rows(dat_uk) %>%
     filter(confirmed_cases >=10)
   
-  cov_progress <- function(df,
+  cov_change <- function(df,
                            startdate,
                            enddate,
                            index = days,
@@ -921,7 +921,8 @@ server <- function(input, output) {
              diffs = c(NA, diff({{outcome}})),
              #diffs = c(NA, diff(confirmed_cases)),
              change = roll_sumr(diffs, n = smooth_by),
-             change_prev = roll_sumr(lag(change, n = smooth_by)),
+             #change_prev = roll_sumr(lag(change, n = smooth_by)),
+             change_prev = lag(change, n = smooth_by),
              ratio = change/change_prev,
              index = max({{index}})
       ) %>% 
@@ -964,9 +965,9 @@ server <- function(input, output) {
   }
   
   
-  output$loglogplot <- renderPlot({
+  output$changeplot <- renderPlot({
     dat %>%
-      cov_progress(
+      cov_change(
         startdate = input$DatesSlider[1],
         enddate = input$DatesSlider[2],
         index = as.numeric(date),
@@ -990,7 +991,7 @@ server <- function(input, output) {
       label = "Choose countries/groups (autocompletes + can click and delete)",
       choices = possible_countries,
       selected = c("Scotland", "UK", "Italy", "France", "Spain", "US",
-                   "Germany", "Austria"),
+                   "Germany"),
       multiple = TRUE
     )
   })
@@ -1018,8 +1019,8 @@ ui <- fluidPage(
                              timeFormat="%Y-%m-%d"), 
                  width = 3), 
     mainPanel(width = 9,
-              plotOutput("loglogplot", height = "100%"),
-              tags$head(tags$style("#loglogplot{height:80vh !important;}"))
+              plotOutput("changeplot", height = "100%"),
+              tags$head(tags$style("#changeplot{height:80vh !important;}"))
     ),
   )
 )

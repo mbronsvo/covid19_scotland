@@ -887,7 +887,7 @@ Global weekly growth {data-navmenu="Global"}
 
 Row 
 -------------------------------------
-### <strong>Weekly growth of COVID-19.</strong></br>This is a plot of the ratio of total number of new cases/deaths during the current week vs the previous week. A ratio of 1 means that the number of new cases this week were the same as last week, a ratio greater than one means that the number of cases this week were greater than last week and a ratio less than one mean that the number of cases this week were less than the previous week. The user can change the period of time being compared. 
+### <strong>Weekly growth of COVID-19.</strong></br>This is a plot of the ratio of total number of new cases/deaths during the current week vs the previous week. A ratio of 1 means that the number of new cases this week were the same as last week, a ratio greater than one means that the number of cases this week were greater than last week and a ratio less than one mean that the number of cases this week were less than the previous week. The user can **change** the **period of time** being compared using the *Sum over X number of days* option and can plot **each country separately** using the *facet* option. 
 
 ```{r}
 server <- function(input, output) {
@@ -912,7 +912,7 @@ server <- function(input, output) {
     df <- df %>% 
       subset(date >= lubridate::ymd("2020-02-20")) %>%
       subset(date >= startdate &  date <= enddate) %>%
-      filter(!is.na({{outcome}})) %>%  
+      filter(!is.na({{outcome}})) %>% 
       #filter(!is.na(confirmed_cases)) %>%  
       group_by({{group}}) %>%
       #group_by(country_region) %>%
@@ -927,7 +927,9 @@ server <- function(input, output) {
              index = max({{index}})
       ) %>% 
       ungroup() %>% 
-      filter(!is.na(change_prev)) 
+      filter(!is.na(change_prev)) %>%
+      filter(!is.infinite(ratio)) %>%
+      mutate(`All countries` = "All countries")
     
     
     df <- df %>% 
@@ -944,17 +946,23 @@ server <- function(input, output) {
     
     ggplot(df_hi) +
       aes(x = date, y = ratio, group = {{group}}) +
-      geom_line(data = df_hi, lwd = 1.5, aes(colour = {{group}})) +
+      geom_line(data = df_hi, lwd = 1.2, aes(colour = {{group}})) +
       geom_point(data = df_hi, aes(colour = {{group}})) +
       scale_y_continuous(trans = "log10",
                          labels = scales::comma_format(accuracy = 1),
                          #breaks = breaks,
-                         expand = expansion(mult = 0.1)) +
+                         expand = expansion(mult = 0.1)
+                         ) +
+      scale_x_date(breaks = function(x) seq.Date(from = min(x)+days(3), 
+   											  to = max(x)-days(3), 
+   											  by = "7 days")) + 
       geom_hline(yintercept = 1, linetype = "dashed", colour = "black")+
-      geom_label_repel(aes(label = label, colour = {{group}}),
-                       na.rm = TRUE, size = 5,
-                       fill = fill_colour,
-                       segment.color = NA) +
+      #geom_label_repel(aes(label = label, colour = {{group}}),
+      #                 na.rm = TRUE, size = 5,
+      #                 fill = fill_colour,
+      #                 segment.color = NA) +
+      #facet_wrap(~country_region, ncol =2) + 
+      #facet_grid(~get(input$Select_unit))
       #coord_cartesian(xlim  = c(xlim, NA), ylim = c(ylim, NA)) +
       guides(x = guide_axis(check.overlap = TRUE), y = guide_axis(check.overlap = TRUE)) +
       labs(y = str_glue("Ratio"),
@@ -966,7 +974,7 @@ server <- function(input, output) {
   
   
   output$changeplot <- renderPlot({
-    dat %>%
+    p <- dat %>%
       cov_change(
         startdate = input$DatesSlider[1],
         enddate = input$DatesSlider[2],
@@ -975,9 +983,26 @@ server <- function(input, output) {
         group = country_region,
         smooth_by = input$smooth,
         highlight = input$countries
-      ) +
+      ) 
+    
+    facets <- paste('~', input$facet)
+    if (facets != '~ .')
+      p <- p + facet_wrap(facets, ncol =2) +
+      scale_x_date(breaks = function(x) seq.Date(from = min(x)+days(5), 
+   											  to = max(x)-days(2), 
+   											  by = "14 days")) +
+      theme_bw(base_size = 14) +
+      theme(legend.position = "none") 
+    if (facets == '~ .')
+      p <- p + 
+      geom_label_repel(aes(label = label, colour = country_region),
+                       na.rm = TRUE, size = 5,
+                       fill = "white",
+                       segment.color = NA) +
       theme_bw(base_size = 16) +
       theme(legend.position = "none")
+    
+    print(p)
     
   })
   
@@ -1005,7 +1030,7 @@ ui <- fluidPage(
   h3(""),
   sidebarLayout(
     sidebarPanel(uiOutput("cboxes"),
-                 sliderInput("smooth", label = "Smooth over X number of days",
+                 sliderInput("smooth", label = "Sum over X number of days",
                              min = 1, max = 7,
                              value = 7, step = 1),
                  radioButtons("type", "Choose outcome measure",
@@ -1017,6 +1042,7 @@ ui <- fluidPage(
                              max = Sys.Date(),
                              value=c(lubridate::ymd("2020-02-20"), Sys.Date()),
                              timeFormat="%Y-%m-%d"), 
+                 selectInput('facet', 'Facet', c(None='.', "country_region")),
                  width = 3), 
     mainPanel(width = 9,
               plotOutput("changeplot", height = "100%"),
@@ -1027,6 +1053,9 @@ ui <- fluidPage(
 
 shinyApp(ui = ui, server = server)
 ```
+
+
+
 
 
 Static plots UK {data-navmenu="Static plots"}
@@ -1145,6 +1174,7 @@ downloadHandler(
     }
 )
 ```
+
 
 Static plots Scotland {data-navmenu="Static plots"}
 =============================================================

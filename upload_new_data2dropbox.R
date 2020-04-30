@@ -24,6 +24,14 @@ dat_uk_total <- dat_uk %>%
   group_by(country_region) %>% 
   summarise(CumDeaths = max(deaths,na.rm = T))
 
+# Scot gov daily data
+url_scot_country <- "https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/04/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/documents/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/govscot%3Adocument/Trends%2Bin%2Bdaily%2BCOVID-19%2Bdata.xlsx?forceDownload=true"
+url_scot_hb <- "https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/04/trends-in-number-of-people-in-hospital-with-confirmed-or-suspected-covid-19/documents/covid-19-data-by-nhs-board/covid-19-data-by-nhs-board/govscot%3Adocument/COVID-19%2Bdata%2Bby%2BNHS%2BBoard.xlsx?forceDownload=true"
+
+GET(url_scot_country, write_disk(scot_data_gov <- tempfile(fileext = ".xlsx")))
+GET(url_scot_hb, write_disk(scot_data_gov_hb <- tempfile(fileext = ".xlsx")))
+
+
 # Import Scottish Data
 WATTY62CASES <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/new_daily_cases.csv"
 WATTY62REGIONALCASES <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/data/processed/regional_cases.csv"
@@ -35,21 +43,30 @@ WATTY62TESTS <- "https://raw.githubusercontent.com/watty62/Scot_covid19/master/d
 scot_pop <- read_csv(file =WATTY62POP )
 
 # Scottish healthboard cases data
+data_hb_scot_gov <- read_excel(scot_data_gov_hb, sheet = "Table 1 - Cumulative cases", skip = 2) %>%
+                    rename("Grand Total"= Scotland) %>%
+                    mutate(date = ymd(Date)) %>%
+                    select(-Date) %>%
+                    filter(date > dmy("26/04/2020")) %>%
+                    mutate_at(vars(-date),
+                      ~parse_number(as.character(.)) )
+names(data_hb_scot_gov) <- str_remove(names(data_hb_scot_gov), "NHS ") 
+
+data_hb_scot_gov <- data_hb_scot_gov %>%
+rename("Ayrshire and Arran" = "Ayrshire & Arran", 
+       "Dumfries and Galloway" = "Dumfries & Galloway",
+        "Greater Glasgow and Clyde" = "Greater Glasgow & Clyde") 
+
 scot_data_raw <- read_csv(file = WATTY62REGIONALCASES) %>%
- filter(!(Date == "15-Apr-2020" & Borders == 208))
-
-#write_csv(scot_data_raw, "regional_cases_upto_07042020.csv")
-
-scot_data <- scot_data_raw %>%
-  rename(confirmed_cases= `Grand Total`) %>%
-  mutate(new_cases = confirmed_cases - replace_na(lag(confirmed_cases),0)) %>%
-  mutate(doubling_time_week = 7*log(2)/log(confirmed_cases/replace_na(lag(confirmed_cases,7),0))) %>%
+  #select(-`Grand Total`) %>%
   mutate(date = lubridate::dmy(Date)) %>%
+  filter(date < dmy("27-Apr-2020")) %>%
   select(-Date) %>%
-  replace_na(list(new_cases = 0)) %>%
+  bind_rows(data_hb_scot_gov) %>%
   mutate(country_region = "Scotland")
 
-scot_data_health_board <- scot_data %>% 
+
+scot_data_health_board <- scot_data_raw %>% 
   select(date, `Ayrshire and Arran`:`Western Isles`) %>%
   pivot_longer(`Ayrshire and Arran`:`Western Isles`,
                names_to = "health_board",
@@ -64,10 +81,12 @@ scot_data_health_board_total <- scot_data_health_board %>%
   summarise(CasesSum = max(confirmed_cases, na.rm = T))
 
 # Scottish overall cases
-scot_cases <- read_csv(file = WATTY62CASES) %>%
-  rename("new_cases" = "New cases") %>%
-  mutate(date = lubridate::dmy(Date)) %>%
-  mutate(confirmed_cases = cumsum(new_cases)) %>%
+scot_cases <- read_excel(scot_data_gov, sheet = "Table 5 - Testing", skip = 3) %>%
+           rename("Date" = "...1", 
+         "confirmed_cases" = "Positive") %>%
+           select(-Negative, -Total) %>%
+  mutate(new_cases = c(1, diff(confirmed_cases, 1))) %>%
+  mutate(date = lubridate::ymd(Date)) %>%
   mutate(doubling_time_week = 7*log(2)/log(confirmed_cases/replace_na(lag(confirmed_cases,7),0))) %>%
   select(-Date) %>%
   mutate(country_region = "Scotland")
@@ -75,18 +94,14 @@ scot_cases <- read_csv(file = WATTY62CASES) %>%
 scot_data <- scot_cases
 
 # Scottish death data
-scot_deaths <- read_csv(file = WATTY62DEATHS) 
-scot_deaths[scot_deaths == "x"] <- NA             
 
-scot_deaths <- scot_deaths %>%
-  mutate(Date = case_when(Date == "10-Apr-2020" & lag(.$Date) == "31-Mar-2020" ~ "1-Apr-2020", 
-                          TRUE ~ Date)) %>%
-  rename(deaths= `Grand Total`) %>%
+scot_deaths <- read_excel(scot_data_gov, sheet = "Table 8 - Deaths", skip =2) %>%
+  select(Date, `Number of COVID-19 confirmed deaths registered to date`) %>%
+  rename(deaths = `Number of COVID-19 confirmed deaths registered to date`) %>%
   mutate(new_deaths = deaths - replace_na(lag(deaths),0)) %>%
   mutate(doubling_time_week = 7*log(2)/log(deaths/replace_na(lag(deaths,7),0))) %>%
-  mutate(date = lubridate::dmy(Date)) %>%
+  mutate(date = lubridate::ymd(Date)) %>%
   select(-Date) %>%
-  replace_na(list(Deaths = 0)) %>%
   mutate(country_region = "Scotland")
 
 
@@ -102,12 +117,28 @@ uk_scot_data <- dat_uk %>%
   bind_rows(scot_data_all)
 
 
+
 # Scottish tests
-scot_tests <- read_csv(file = WATTY62TESTS) 
+data_testing <- read_excel(scot_data_gov, sheet = "Table 5 - Testing", skip = 3) %>%
+  rename("Date" = "...1", 
+         "Total Positive" = "Positive", 
+         "Total Negative" = "Negative") %>%
+  mutate(date = ymd(Date)) %>%
+  select(-Date) %>%
+  filter(date > dmy("26/04/2020"))
+
+scot_tests <- read_csv(file = WATTY62TESTS) %>%
+  mutate(date = dmy(Date)) %>%
+  filter(date < dmy("27-Apr-2020")) %>%
+  select(-Date) %>%
+  bind_rows(data_testing) %>%
+  mutate(Conducted = c(2, diff(Total, 1)),
+         `Today Positive` = c(0, diff(`Total Positive`, 1)),
+         `Today Negative` = c(2, diff(`Total Negative`, 1)))
+  
 scot_tests <- scot_tests %>%
-  mutate(date = seq(dmy("24-Jan-2020"),dmy("24-Jan-2020")+days(nrow(scot_tests)-1), by = 1)) %>%
-  left_join(select(scot_deaths, date,new_deaths, deaths), by = "date") %>%
-  mutate(deaths_per_case = deaths/`Total Positive`,
+left_join(select(scot_deaths, date,new_deaths, deaths), by = "date") %>%
+mutate(deaths_per_case = deaths/`Total Positive`,
          cases_per_test = `Total Positive`/Total)
 
 scot_tests_long <- scot_tests %>%
@@ -117,12 +148,12 @@ scot_tests_long <- scot_tests %>%
 
 
 #Overall deaths 
-myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-15.xlsx"
+myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-17.xlsx"
 GET(myurl_deaths, write_disk(tmp <- tempfile(fileext = ".xlsx")))
 nrs_deaths_covid_raw <- read_excel(tmp, sheet = "Table 1 - COVID deaths", skip = 3) %>%
   select(-`Year to Date`) %>%
   rename("Details" = "...2",
-         "Total" = "...19")
+         "Total" = "...21")
 nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths involving COVID-194") %>%
   pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
                names_to = "week_beginning", 
@@ -131,10 +162,12 @@ nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths 
   mutate(Type = "Covid19 deaths") %>%
   select(week_beginning, weekly_deaths_total, Type)
 
+nrs_week <- max(nrs_deaths_covid$week_beginning)+6
+
 nrs_deaths_all <- read_excel(tmp, sheet = "Table 2 - All deaths", skip = 3) %>% 
-  select(-`...18`) %>%
+  select(-`...20`) %>%
   rename("Details" = "...2",
-         "Total" = "...19") %>%
+         "Total" = "...21") %>%
   filter(`Week beginning` %in% c("Total deaths from all causes", "Total deaths: average of corresponding")) %>%
   pivot_longer(cols = `43829`:names(.)[ncol(.)-1],
                names_to = "week_beginning", 
@@ -144,14 +177,15 @@ nrs_deaths_all <- read_excel(tmp, sheet = "Table 2 - All deaths", skip = 3) %>%
                        "Total deaths: average of corresponding" = "All causes - 5 year average")) %>%
   select(week_beginning, weekly_deaths_total, Type)
 
+
 nrs_deaths_comparison <- bind_rows(nrs_deaths_covid, nrs_deaths_all)
 
 nrs_deaths_healthboards_total <- nrs_deaths_covid_raw %>%
                           filter(Details %in% scot_data_health_board_total$health_board) %>%
   pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
                names_to = "week_beginning", 
-               values_to = "weekly_deaths_total") %>%
-  mutate(week_beginning = janitor::excel_numeric_to_date(parse_number(week_beginning))) %>%
+               values_to = "weekly_deaths_total") %>% 
+  mutate(week_beginning = janitor::excel_numeric_to_date(parse_number(week_beginning))) %>% 
   mutate(Type = "Covid19 deaths") %>%
   arrange(desc(week_beginning)) %>%
   distinct(Details, .keep_all = TRUE) %>%
@@ -251,7 +285,7 @@ covid_deaths_2020 <- covid_deaths_2020 %>%
 #save.image(file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
 save(cases_by_area,cov_globaldata,cov_offset, cov_trajplot, cov_ukdata,
      covid_deaths_2020, dat_uk, dat_uk_total, dat_world, data_hosp_hosp, 
-     data_hosp_icu, last_week, 
+     data_hosp_icu, last_week, nrs_week,
      ref, 
      scot_cases, scot_data, scot_data_all, scot_data_health_board, scot_data_health_board_total,
      scot_data_raw, scot_deaths, scot_pop,  scot_tests, scot_tests_long, uk_scot_data, 

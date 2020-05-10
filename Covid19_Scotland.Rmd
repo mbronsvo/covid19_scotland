@@ -54,7 +54,7 @@ plot_ly(data = scot_data, x = ~date, y = ~new_cases, text = ~new_cases, color = 
   layout(barmode = 'stack',
          xaxis = list(
         type = 'date',
-        tickformat = "%d %B", 
+        tickformat = "%d %b", 
         title = ""), 
         yaxis = list(title = "")) 
 })
@@ -69,7 +69,7 @@ plot_ly(data = scot_data, x = ~date, y = ~confirmed_cases, color = ~I("#297fe1")
 plotly::config(displayModeBar = FALSE)  %>%
   layout(xaxis = list(
         type = 'date',
-        tickformat = "%d %B", 
+        tickformat = "%d %b", 
         title = ""), 
         yaxis = list(title = "",
                      range=c(0,max(scot_data$confirmed_cases) + 50),
@@ -92,7 +92,7 @@ plot_ly(data = scot_tests_long, x = ~date, y = ~Number, text = ~Conducted, color
   layout(barmode = 'stack',
          xaxis = list(
         type = 'date',
-        tickformat = "%d %B", 
+        tickformat = "%d %b", 
         #showgrid = F,
         title = ""), 
         yaxis = list(title = "",
@@ -110,7 +110,7 @@ plot_ly(data = scot_tests, x = ~date, y = ~cases_per_test, color = ~I("#297fe1")
   plotly::config(displayModeBar = FALSE)  %>%
   layout(xaxis = list(
         type = 'date',
-        tickformat = "%d %B", 
+        tickformat = "%d %b", 
         title = ""), 
         yaxis = list(title = "",
                      range=c(0,max(scot_tests$deaths_per_case) + 0.01)),
@@ -137,12 +137,12 @@ renderPlotly({
   layout(barmode = 'stack',
          xaxis = list(
            type = 'date',
-           tickformat = "%d %B", 
+           tickformat = "%d %b", 
            #showgrid = F,
            title = ""), 
          yaxis = list(title = "",
                       tickformat = "digit"),
-          legend = list(x = 0.1, y = 0.9)
+          legend = list(x = 0.02, y = 0.9)
          ) %>%
     partial_bundle()
 })
@@ -164,7 +164,7 @@ plot_ly(data = data_hosp_icu, x = ~date, y = ~Number, text = ~ICU_total,
   layout(barmode = 'stack',
          xaxis = list(
            type = 'date',
-           tickformat = "%d %B", 
+           tickformat = "%d %b", 
            #showgrid = F,
            title = ""), 
          yaxis = list(title = "",
@@ -214,14 +214,17 @@ ts <- scot_data_raw %>%
   unnest(offset) %>% 
   select(-data)
 
-line_2 <- tibble( days = seq(0, max(ts$days)-8)) %>% 
+line_2 <- tibble( days = seq(0, max(ts$days)-18)) %>% 
   mutate(cases = c(ref, ref * exp(log(2) / 2) ^ (1:(n()-1))))
 
-line_3 <- tibble( days = seq(0, max(ts$days))) %>% 
+line_3 <- tibble( days = seq(0, max(ts$days)-30)) %>% 
   mutate(cases = c(ref, ref * 1.260 ^ (1:(n()-1))))
 
 line_7 <- tibble( days = seq(0, max(ts$days))) %>% 
   mutate(cases = c(ref, ref * 1.104 ^ (1:(n()-1))))
+
+line_14 <- tibble( days = seq(0, max(ts$days))) %>% 
+  mutate(cases = c(ref, ref * exp(log(2) / 14) ^ (1:(n()-1))))
 
 p<- ts %>% 
   group_by(health_board) %>% 
@@ -245,6 +248,7 @@ p<- ts %>%
   #geom_line(data = line_2, aes(x = days, y = cases), colour = "grey30", linetype = "twodash") +
   geom_line(data = line_3, aes(x = days, y = cases), colour = "grey30", lty = 3) +
   geom_line(data = line_7, aes(x = days, y = cases), colour = "grey30", lty = 2) +
+  geom_line(data = line_14, aes(x = days, y = cases), colour = "grey30", lty = "twodash") +
   theme_bw(base_size = 12) +
   theme(legend.position = "none",
         plot.background = element_rect(fill = ft_fill),
@@ -264,7 +268,8 @@ w <- ggplotly(p) %>%
 w %>%
   #style(text = "Doubling in 2 days", traces = 14) %>%
   style(text = "Doubling in 3 days", traces = 14) %>%
-  style(text = "Doubling in 7 days", traces = 15)
+  style(text = "Doubling in 7 days", traces = 15) %>%
+  style(text = "Doubling in 14 days", traces = 16) 
 
 })
 ```
@@ -347,7 +352,7 @@ scot_deaths %>%
   plotly::config(displayModeBar = FALSE)  %>%
   layout(xaxis = list(
         type = 'date',
-        tickformat = "%d %B", title = ""), 
+        tickformat = "%d %b", title = ""), 
         yaxis = list(title = "")) %>%
     partial_bundle()
 })
@@ -362,7 +367,7 @@ plot_ly(data = scot_deaths, x = ~date, y = ~deaths, color = ~I("#297fe1"), type 
   plotly::config(displayModeBar = FALSE)  %>%
   layout(xaxis = list(
         type = 'date',
-        tickformat = "%d %B", 
+        tickformat = "%d %b", 
         title = ""), 
         yaxis = list(title = "",
                      range=c(0,max(scot_deaths$deaths + 5)),
@@ -405,11 +410,14 @@ ts <- dat_uk %>%
 line_2 <- tibble( days = seq(0, max(ts$days))) %>% 
   mutate(cases = c(ref, ref * exp(log(2) / 2) ^ (1:(n()-1))))
 
-line_3 <- tibble( days = seq(0, max(ts$days))) %>% 
+line_3 <- tibble( days = seq(0, max(ts$days)-18)) %>% 
   mutate(cases = c(ref, ref * exp(log(2) / 3) ^ (1:(n()-1))))
 
 line_7 <- tibble( days = seq(0, max(ts$days))) %>% 
   mutate(cases = c(ref, ref * exp(log(2) / 7) ^ (1:(n()-1))))
+
+line_14 <- tibble( days = seq(0, max(ts$days))) %>% 
+  mutate(cases = c(ref, ref * exp(log(2) / 14) ^ (1:(n()-1))))
 
 
 p <- ggplot(ts) +
@@ -423,9 +431,10 @@ p <- ggplot(ts) +
        y = "Cumulative deaths",
        colour = "Region",
        caption = "dotted line: doubling every 3 days; dashed line: doubling every 7 days") +
-  geom_line(data = line_2, aes(x = days, y = cases), colour = "grey70", linetype = "twodash") +
+  #geom_line(data = line_2, aes(x = days, y = cases), colour = "grey70", linetype = "twodash") +
   geom_line(data = line_3, aes(x = days, y = cases), colour = "grey70", lty = 3) +
-  geom_line(data = line_7, aes(x = days, y = cases), colour = "grey50", lty = 2) +
+  geom_line(data = line_7, aes(x = days, y = cases), colour = "grey70", lty = 2) +
+  geom_line(data = line_14, aes(x = days, y = cases), colour = "grey70", linetype = "twodash") +
   theme(legend.position = "none") +
   theme_bw(base_size = 12) +
   theme(legend.position = "none",
@@ -444,9 +453,10 @@ w <- ggplotly(p) %>%
 #w$x$data
 
 w %>%
-  style(text = "Doubling in 2 days", traces = 6) %>%
-  style(text = "Doubling in 3 days", traces = 7) %>%
-  style(text = "Doubling in 7 days", traces = 8)
+  #style(text = "Doubling in 2 days", traces = 6) %>%
+  style(text = "Doubling in 3 days", traces = 6) %>%
+  style(text = "Doubling in 7 days", traces = 7) %>%
+  style(text = "Doubling in 14 days", traces = 8)
 })
 ```
 
@@ -459,7 +469,7 @@ plot_ly(data = scot_tests, x = ~date, y = ~deaths_per_case, color = ~I("#297fe1"
   plotly::config(displayModeBar = FALSE)  %>%
   layout(xaxis = list(
         type = 'date',
-        tickformat = "%d %B", 
+        tickformat = "%d %b", 
         title = ""), 
         yaxis = list(title = "",
                      range=c(0,max(scot_tests$deaths_per_case) + 0.1)),
@@ -473,7 +483,7 @@ Deaths demographics {data-navmenu="Scotland"}
 Row
 -------------------------------------
 
-### Scotland Covid-19 related deaths data upto week commencing `r last_week`
+### Scotland Covid-19 related deaths data upto week commencing `r last_week` (source: NRS)
 ```{r}
 renderPlotly({
  plot_ly(covid_deaths_2020, x = ~Age, y = ~Value, type = 'bar', color = ~ Sex, text = ~Sex, colors = viridis(3)[c(1,2)],
@@ -493,7 +503,7 @@ renderPlotly({
 })
 ```
 
-### Scotland Covid-19 related deaths by 10,000 population
+### Scotland Covid-19 related deaths by 10,000 population (source: NRS)
 ```{r}
 renderPlotly({
  plot_ly(covid_deaths_2020_pop, x = ~Age, y = ~(deaths/population * 10000),
@@ -517,13 +527,71 @@ renderPlotly({
 })
 ```
 
-
-Deaths 5 year comparison {data-navmenu="Scotland"}
+Deaths by location {data-navmenu="Scotland"}
 =======================================================================
 Row
 -------------------------------------
 
-### Scotland weekly deaths data upto week commencing `r last_week` 
+### Scotland weekly deaths data upto week commencing `r last_week` (source: NRS)
+
+```{r}
+renderPlotly({
+plot_ly(data = nrs_deaths_covid_week_location %>% filter(Location != "All" & week_beginning > ymd("2020-03-09")), x = ~week_beginning_f, 
+        y = ~weekly_deaths_total, text = ~Location, 
+        color = ~Location, type = "bar", #colors = c("#b24b29", "#297fe1", "#009E73"), 
+        colors = viridis(3, option = "D")[c(2,1,3)],
+        hovertemplate = paste('Week beginning: %{x}',
+                              '<br>Number: %{y}',
+                              '<br>Total: %{text}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(barmode = 'stack',
+         xaxis = list(
+           #type = 'date',
+           #tickformat = "%d %b", 
+           #showgrid = F,
+           title = ""), 
+         yaxis = list(title = "",
+                      tickformat = "digit"),
+         legend = list(x = 0.02, y = 0.9)
+  ) %>%
+  partial_bundle()
+})
+```
+
+### Scotland weekly deaths trends upto week commencing `r last_week` (source: NRS)
+```{r}
+renderPlotly({
+plot_ly(data = nrs_deaths_covid_week_location %>% filter(Location != "All" & week_beginning > ymd("2020-03-09")), x = ~week_beginning_f, 
+        y = ~weekly_deaths_total, text = ~Location, 
+        color = ~Location, type = 'scatter', mode = 'lines', #colors = c("#b24b29", "#297fe1", "#009E73"), 
+        colors = viridis(3, option = "D")[c(2,1,3)],
+        hovertemplate = paste('Week beginning: %{x}',
+                              '<br>Number: %{y}',
+                              '<br>Total: %{text}<extra></extra>')) %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(barmode = 'stack',
+         xaxis = list(
+           #type = 'date',
+           #tickformat = "%d %b", 
+           #showgrid = F,
+           title = ""), 
+         #yaxis = list(title = "",
+         #             tickformat = "digit"),
+         yaxis = list(title = "",
+                     range=c(0,NA),
+                     tickformat = "digit"),
+         legend = list(x = 0.02, y = 0.9)
+  ) %>%
+  partial_bundle()
+})
+```
+
+Deaths 5 year comparison {data-navmenu="Scotland"} 
+=======================================================================
+Row
+-------------------------------------
+
+### Scotland weekly deaths data upto week commencing `r last_week` (source: NRS)
 
 ```{r}
 renderPlotly({
@@ -1254,7 +1322,7 @@ downloadHandler(
 About {data-icon="fa-info-circle"} 
 =======================================================================
 
-Row {data-height=300}
+Row {data-height=275}
 -----------------------------------------------------------------------
 ### **Disclaimer** 
 This visualisation of the Scottish and United Kingdom data is based on the data available from colleagues who have been monitoring the numbers and are not official numbers. Therefore these plots should not be used for official decision making but rather are there to help the general population of the UK and particularly Scotland understand how this epidemic is unfolding and the importance of social distancing to help slow its spread.
@@ -1263,7 +1331,7 @@ This visualisation of the Scottish and United Kingdom data is based on the data 
 
 We have used logarithmic scales for the case and death trajectories to make it clear to see the doubling rates different populations are following.
 
-Row {data-height=400}
+Row {data-height=450}
 -----------------------------------------------------------------------
 ### **Data sources** 
 
@@ -1279,7 +1347,7 @@ Row {data-height=400}
 9. [**Maps (UK)**](https://gadm.org/)
 10. [**World data**](https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/ and https://covid.ourworldindata.org/data/ecdc/full_data.csv)
  
-Row {data-height=300}
+Row {data-height=275}
 -----------------------------------------------------------------------
 ### **Credits**
 This site and data visualisation was prepared by members of the Epidemiology, Economics and Risk Assessment (<a href="https://www.ed.ac.uk/roslin/eeragroup" target="_blank">EERA</a>) Group at the University of Edinburgh, the Royal Dick School of Veterinary Studies (R(D)SVS). Please email us at mark.bronsvoort@roslin.ed.ac.uk with any questions or comments. 

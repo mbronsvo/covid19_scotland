@@ -148,12 +148,12 @@ scot_tests_long <- scot_tests %>%
 
 
 #Overall deaths 
-myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-17.xlsx"
+myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-18.xlsx"
 GET(myurl_deaths, write_disk(tmp <- tempfile(fileext = ".xlsx")))
 nrs_deaths_covid_raw <- read_excel(tmp, sheet = "Table 1 - COVID deaths", skip = 3) %>%
   select(-`Year to Date`) %>%
   rename("Details" = "...2",
-         "Total" = "...21")
+         "Total" = "...22")
 nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths involving COVID-194") %>%
   pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
                names_to = "week_beginning", 
@@ -165,9 +165,9 @@ nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths 
 nrs_week <- max(nrs_deaths_covid$week_beginning)+6
 
 nrs_deaths_all <- read_excel(tmp, sheet = "Table 2 - All deaths", skip = 3) %>% 
-  select(-`...20`) %>%
+  select(-`...21`) %>%
   rename("Details" = "...2",
-         "Total" = "...21") %>%
+         "Total" = "...22") %>%
   filter(`Week beginning` %in% c("Total deaths from all causes", "Total deaths: average of corresponding")) %>%
   pivot_longer(cols = `43829`:names(.)[ncol(.)-1],
                names_to = "week_beginning", 
@@ -191,6 +191,26 @@ nrs_deaths_healthboards_total <- nrs_deaths_covid_raw %>%
   distinct(Details, .keep_all = TRUE) %>%
   rename("Deaths" = Total, 
          "health_board" = Details)
+
+nrs_deaths_covid_week_location <- nrs_deaths_covid_raw %>% 
+  filter(`Week beginning` == "Deaths involving COVID-194" | 
+           Details %in% c("Care Home", "Home / Non-institution", "Hospital", "Other institution")) %>%
+  pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
+               names_to = "week_beginning", 
+               values_to = "weekly_deaths_total") %>%
+  mutate(Details = case_when(`Week beginning` == "Deaths involving COVID-194" ~ "All",
+                             TRUE ~ Details)) %>%
+  mutate(week_beginning = janitor::excel_numeric_to_date(parse_number(week_beginning))) %>%
+  mutate(Type = "Covid19 deaths") %>%
+  rename("Location" = Details) %>%
+  filter(Location != "Other institution") %>%
+  select(Location, week_beginning, weekly_deaths_total, Type) %>%
+  mutate(week_ending = week_beginning + 6)
+
+nrs_deaths_covid_week_location$week_beginning_f <- factor(format(nrs_deaths_covid_week_location$week_beginning, "%d %b"), 
+                                                    levels= unique(format(nrs_deaths_covid_week_location$week_beginning, "%d %b") ))
+nrs_deaths_covid_week_location$Location <- factor(nrs_deaths_covid_week_location$Location, levels = c("Hospital", "Care Home", "Home / Non-institution"))
+
 
 # Map files
 # SCOTLAND MAP
@@ -285,7 +305,7 @@ covid_deaths_2020 <- covid_deaths_2020 %>%
 #save.image(file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
 save(cases_by_area,cov_globaldata,cov_offset, cov_trajplot, cov_ukdata,
      covid_deaths_2020, dat_uk, dat_uk_total, dat_world, data_hosp_hosp, 
-     data_hosp_icu, last_week, nrs_week,
+     data_hosp_icu, last_week, nrs_week, nrs_deaths_covid_week_location,
      ref, 
      scot_cases, scot_data, scot_data_all, scot_data_health_board, scot_data_health_board_total,
      scot_data_raw, scot_deaths, scot_pop,  scot_tests, scot_tests_long, uk_scot_data, 

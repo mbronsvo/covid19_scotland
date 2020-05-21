@@ -83,7 +83,7 @@ cov_ukdata <- function() {
   
   # impute England
   
-   dat %>% 
+  dat %>% 
      pivot_longer(cols = c(confirmed_cases, deaths, recovered),
                   names_to = "type", values_to = "value") %>% 
      pivot_wider(names_from = country_region, values_from = value) %>%  
@@ -92,6 +92,7 @@ cov_ukdata <- function() {
                   names_to = "country_region",
                   values_to = "value") %>% 
      pivot_wider(names_from = type, values_from = value)
+   
 }
 
 # from https://www.ons.gov.uk/peoplepopulationandcommunity/populationandmigration/populationestimates/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland

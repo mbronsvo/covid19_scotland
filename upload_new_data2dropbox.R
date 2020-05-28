@@ -149,12 +149,12 @@ scot_tests_long <- scot_tests %>%
 
 
 #Overall deaths 
-myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-20.xlsx"
+myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-21.xlsx"
 GET(myurl_deaths, write_disk(tmp <- tempfile(fileext = ".xlsx")))
 nrs_deaths_covid_raw <- read_excel(tmp, sheet = "Table 1 - COVID deaths", skip = 3) %>%
   select(-`Year to Date`) %>%
   rename("Details" = "...2",
-         "Total" = "...24")
+         "Total" = "...25")
 nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths involving COVID-194") %>%
   pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
                names_to = "week_beginning", 
@@ -166,9 +166,9 @@ nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths 
 nrs_week <- max(nrs_deaths_covid$week_beginning)+6
 
 nrs_deaths_all <- read_excel(tmp, sheet = "Table 2 - All deaths", skip = 3) %>% 
-  select(-`...23`) %>%
+  select(-`...24`) %>%
   rename("Details" = "...2",
-         "Total" = "...24") %>%
+         "Total" = "...25") %>%
   filter(`Week beginning` %in% c("Total deaths from all causes", "Total deaths: average of corresponding")) %>%
   mutate_if(is.numeric,as.character, is.factor, as.character) %>%
   pivot_longer(cols = `43829`:names(.)[ncol(.)-1],

@@ -340,7 +340,8 @@ server <- function(input, output) {
   select(date, health_board, confirmed_cases) %>% 
   group_by(health_board) %>% 
   arrange(date) %>%
-  mutate(new_cases = confirmed_cases - replace_na(lag(confirmed_cases), 0))
+  mutate(new_cases = confirmed_cases - replace_na(lag(confirmed_cases), 0)) %>%
+  mutate(change = roll_sumr(new_cases, n = 7))
 
   
   cov_progress <- function(df,
@@ -387,11 +388,13 @@ server <- function(input, output) {
     scale_x_continuous(trans = "log10",
                        labels = scales::comma_format(accuracy = 1),
                        breaks = breaks,
-                       expand = expansion(mult = 0.2)) +
+                       expand = expansion(mult = 0.2),
+                       limits = c(NA, max(dat$confirmed_cases))) +
     scale_y_continuous(trans = "log10",
                        labels = scales::comma_format(accuracy = 1),
                        breaks = breaks,
-                       expand = expansion(mult = 0.1)) +
+                       expand = expansion(mult = 0.1),
+                       limits = c(NA, 4000)) +
     geom_label_repel(aes(label = label, colour = {{group}}),
                      na.rm = TRUE, size = 5,
                      fill = fill_colour,
@@ -454,10 +457,11 @@ ui <- fluidPage(
     #             selected = "confirmed_cases"),
     sliderInput("DatesSlider",
                 "Date range",
-                min = lubridate::ymd("2020-01-28"),
+                min = lubridate::ymd("2020-03-1"),
                 max = Sys.Date(),
                 value=Sys.Date(),
-                timeFormat="%Y-%m-%d"), 
+                timeFormat="%Y-%m-%d",
+                animate = TRUE), 
     
     splitLayout(cellWidths = c("50%", "50%"),
                 cellArgs = list(style = "padding: 20px"),

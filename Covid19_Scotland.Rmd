@@ -217,7 +217,7 @@ ts <- scot_data_raw %>%
 line_2 <- tibble( days = seq(0, max(ts$days)-18)) %>% 
   mutate(cases = c(ref, ref * exp(log(2) / 2) ^ (1:(n()-1))))
 
-line_3 <- tibble( days = seq(0, max(ts$days)-30)) %>% 
+line_3 <- tibble( days = seq(0, max(ts$days)-50)) %>% 
   mutate(cases = c(ref, ref * 1.260 ^ (1:(n()-1))))
 
 line_7 <- tibble( days = seq(0, max(ts$days))) %>% 

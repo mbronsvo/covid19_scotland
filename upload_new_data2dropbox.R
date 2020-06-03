@@ -86,7 +86,9 @@ scot_cases <- read_excel(scot_data_gov, sheet = "Table 5 - Testing", skip = 3) %
            rename("Date" = "...1", 
          "confirmed_cases" = "Positive") %>%
            select(-Negative, -Total) %>%
-  mutate(new_cases = c(1, diff(confirmed_cases, 1))) %>%
+  #mutate(new_cases = c(1, diff(confirmed_cases, 1))) %>%
+  mutate(new_cases = `Daily...5`) %>%
+  mutate(confirmed_cases = cumsum(`Daily...5`)) %>%
   mutate(date = lubridate::ymd(Date)) %>%
   mutate(doubling_time_week = 7*log(2)/log(confirmed_cases/replace_na(lag(confirmed_cases,7),0))) %>%
   select(-Date) %>%
@@ -126,7 +128,9 @@ data_testing <- read_excel(scot_data_gov, sheet = "Table 5 - Testing", skip = 3)
          "Total Negative" = "Negative") %>%
   mutate(date = ymd(Date)) %>%
   select(-Date) %>%
-  filter(date > dmy("26/04/2020"))
+  filter(date > dmy("26/04/2020")) %>%
+  mutate(`Total Positive` = case_when(date == ymd("2020-06-02") ~ 15471,
+         TRUE ~ `Total Positive`))
 
 scot_tests <- read_csv(file = WATTY62TESTS) %>%
   mutate(date = dmy(Date)) %>%
@@ -149,12 +153,12 @@ scot_tests_long <- scot_tests %>%
 
 
 #Overall deaths 
-myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-21.xlsx"
+myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-22.xlsx"
 GET(myurl_deaths, write_disk(tmp <- tempfile(fileext = ".xlsx")))
 nrs_deaths_covid_raw <- read_excel(tmp, sheet = "Table 1 - COVID deaths", skip = 3) %>%
   select(-`Year to Date`) %>%
   rename("Details" = "...2",
-         "Total" = "...25")
+         "Total" = "...26")
 nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths involving COVID-194") %>%
   pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
                names_to = "week_beginning", 
@@ -166,9 +170,9 @@ nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths 
 nrs_week <- max(nrs_deaths_covid$week_beginning)+6
 
 nrs_deaths_all <- read_excel(tmp, sheet = "Table 2 - All deaths", skip = 3) %>% 
-  select(-`...24`) %>%
+  select(-`...25`) %>%
   rename("Details" = "...2",
-         "Total" = "...25") %>%
+         "Total" = "...26") %>%
   filter(`Week beginning` %in% c("Total deaths from all causes", "Total deaths: average of corresponding")) %>%
   mutate_if(is.numeric,as.character, is.factor, as.character) %>%
   pivot_longer(cols = `43829`:names(.)[ncol(.)-1],

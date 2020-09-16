@@ -8,7 +8,7 @@ library(forcats); library(stringr); library(htmlwidgets); library(lubridate); li
 library(plotly); library(shinythemes);library(leaflet); library(classInt); library(ggrepel); library(scales);
 library(leaflet.extras);library(viridis)
 library(httr); library(readxl)
-#library(tidyverse) ; library(httr) ;  ; library(readxl) ; library(DT) ; #library(rvest); #library(htmltools) ;  library(xml2);
+#library(tidyverse) ; library(httr) ; library(readxl) ; library(DT) ; #library(rvest); #library(htmltools) ;  library(xml2);
 #library(RColorBrewer); 
 #library(ggsci);  
 
@@ -74,21 +74,34 @@ scot_data_health_board <- scot_data_raw %>%
                values_to = "confirmed_cases") %>% 
   group_by(health_board) %>%
   mutate(new_cases = confirmed_cases - replace_na(lag(confirmed_cases), 0)) %>%
-  ungroup() %>%
-  replace_na(list(new_cases = 0))
+  ungroup() #%>%
+  #replace_na(list(new_cases = 0))
 
 scot_data_health_board_total <- scot_data_health_board %>% 
   group_by(health_board) %>%
   summarise(CasesSum = max(confirmed_cases, na.rm = T))
 
+# Scotting daily testing
+scot_tests_perc <- read_excel(scot_data_gov, sheet = "Table 5 - Testing", skip = 3) %>%
+  rename("Date" = "...1") %>%
+  rename(total_people_tested = Total) %>%
+  mutate(new_people_tested = total_people_tested - lag(total_people_tested)) %>%
+  mutate(new_cases = `Daily...5`) %>%
+  mutate(total_daily_tests = `Total daily tests`) %>%
+  mutate(date = lubridate::ymd(Date)) %>%
+  mutate(positive_perc = 100*new_cases/new_people_tested) %>%
+  select(-Date) %>%
+  select(date, new_cases, new_people_tested, total_people_tested, total_daily_tests, positive_perc)
+
 # Scottish overall cases
 scot_cases <- read_excel(scot_data_gov, sheet = "Table 5 - Testing", skip = 3) %>%
            rename("Date" = "...1", 
-         "confirmed_cases" = "Positive") %>%
+         "confirmed_cases" = "Positive"
+         ) %>%
            select(-Negative, -Total) %>%
   #mutate(new_cases = c(1, diff(confirmed_cases, 1))) %>%
   mutate(new_cases = `Daily...5`) %>%
-  mutate(confirmed_cases = cumsum(`Daily...5`)) %>%
+  #mutate(confirmed_cases = cumsum(`Daily...5`)) %>%
   mutate(date = lubridate::ymd(Date)) %>%
   mutate(doubling_time_week = 7*log(2)/log(confirmed_cases/replace_na(lag(confirmed_cases,7),0))) %>%
   select(-Date) %>%
@@ -125,12 +138,37 @@ uk_scot_data <- dat_uk %>%
 data_testing <- read_excel(scot_data_gov, sheet = "Table 5 - Testing", skip = 3) %>%
   rename("Date" = "...1", 
          "Total Positive" = "Positive", 
+         "Total Negative" = "Negative", 
+         "New Positive" = "Daily...5", 
+         "Daily NHS" = "Daily...6",
+         "Cumulative NHS" = "Cumulative...7",
+         "Daily RTC" = "Daily...8", 
+         "Cumulative RTC"= "Cumulative...9") %>%
+  mutate(date = ymd(Date)) %>%
+  select(-Date) %>%
+  mutate(`Daily NHS_RTC` = replace_na(`Daily NHS`, 0) + replace_na(`Daily RTC`, 0),
+         `Daily NHS_RTC` = case_when(date <= ymd("2020-03-31") ~ NA_real_,
+         TRUE ~ as.numeric(`Daily NHS_RTC`))) %>%
+  mutate(`Today Positive` = c(1, diff(`Total Positive`, 1)),
+         `Today Negative` = c(116, diff(`Total Negative`, 1)),
+         `Today Total` = `Today Positive` + `Today Negative`, 
+         #perc_pos = 100*`New Positive`/`Daily NHS_RTC`
+         prec_pos = 100*`Today Positive`/`Today Total`) #See WATTY62TESTS
+
+data_testing_long <- data_testing %>%
+  select(date, `Daily NHS`,`Daily RTC`, `Daily NHS_RTC`) %>%
+  pivot_longer(cols = `Daily NHS`:`Daily RTC`, names_to = "Result", values_to = "Number") %>%
+  mutate(Result = factor(Result, levels = c("Daily NHS", "Daily RTC")))
+
+data_testing <- read_excel(scot_data_gov, sheet = "Table 5 - Testing", skip = 3) %>%
+  rename("Date" = "...1", 
+         "Total Positive" = "Positive", 
          "Total Negative" = "Negative") %>%
   mutate(date = ymd(Date)) %>%
   select(-Date) %>%
-  filter(date > dmy("26/04/2020")) %>%
-  mutate(`Total Positive` = case_when(date == ymd("2020-06-02") ~ 15471,
-         TRUE ~ `Total Positive`))
+  filter(date > dmy("26/04/2020")) #%>%
+  #mutate(`Total Positive` = case_when(date == ymd("2020-06-02") ~ 15471,
+  #       TRUE ~ `Total Positive`))
 
 scot_tests <- read_csv(file = WATTY62TESTS) %>%
   mutate(date = dmy(Date)) %>%
@@ -153,12 +191,12 @@ scot_tests_long <- scot_tests %>%
 
 
 #Overall deaths 
-myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-22.xlsx"
+myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-37.xlsx"
 GET(myurl_deaths, write_disk(tmp <- tempfile(fileext = ".xlsx")))
-nrs_deaths_covid_raw <- read_excel(tmp, sheet = "Table 1 - COVID deaths", skip = 3) %>%
+nrs_deaths_covid_raw <- read_excel(tmp, sheet = "Table 1", skip = 3) %>%
   select(-`Year to Date`) %>%
   rename("Details" = "...2",
-         "Total" = "...26")
+         "Total" = "...41")
 nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths involving COVID-194") %>%
   pivot_longer(cols = `43829`:names(nrs_deaths_covid_raw)[ncol(nrs_deaths_covid_raw)-1],
                names_to = "week_beginning", 
@@ -169,10 +207,10 @@ nrs_deaths_covid <- nrs_deaths_covid_raw %>% filter(`Week beginning` == "Deaths 
 
 nrs_week <- max(nrs_deaths_covid$week_beginning)+6
 
-nrs_deaths_all <- read_excel(tmp, sheet = "Table 2 - All deaths", skip = 3) %>% 
-  select(-`...25`) %>%
+nrs_deaths_all <- read_excel(tmp, sheet = "Table 2 ", skip = 3) %>% 
+  select(-`...40`) %>%
   rename("Details" = "...2",
-         "Total" = "...26") %>%
+         "Total" = "...41") %>%
   filter(`Week beginning` %in% c("Total deaths from all causes", "Total deaths: average of corresponding")) %>%
   mutate_if(is.numeric,as.character, is.factor, as.character) %>%
   pivot_longer(cols = `43829`:names(.)[ncol(.)-1],
@@ -239,6 +277,9 @@ nrs_deaths_covid_week_location$week_beginning_f <- factor(format(nrs_deaths_covi
 nrs_deaths_covid_week_location$Location <- factor(nrs_deaths_covid_week_location$Location, levels = c("Hospital", "Care Home", "Home / Non-institution"))
 
 # NRS HB location 
+myurl_deaths <- "https://www.nrscotland.gov.uk/files//statistics/covid19/covid-deaths-data-week-32.xlsx"
+GET(myurl_deaths, write_disk(tmp <- tempfile(fileext = ".xlsx")))
+
 nrs_deaths_hb_location <- read_excel(tmp, sheet = "Table 3 - deaths by location", skip = 3) %>% 
                           slice(8:21) %>%
                           rename(health_board = "...1",
@@ -276,7 +317,7 @@ myurl <- "https://www.gov.scot/binaries/content/documents/govscot/publications/s
 GET(myurl, write_disk(tmp <- tempfile(fileext = ".xlsx")))
 
 #data_hosp <- read_excel(tmp, sheet = "Table 1", skip = 3)
-data_hosp <- read_excel(tmp, sheet = "Table 2 - Hospital Care", skip = 3)
+data_hosp <- read_excel(tmp, sheet = "Table 2 - Archive Hospital Care", skip = 3)
 
 data_hosp <- data_hosp %>%
   rename("date" = "...1",
@@ -286,28 +327,35 @@ data_hosp <- data_hosp %>%
          "Hospital_confirmed" = "Confirmed...5",
          "Hospital_suspected" = "Suspected...6",
          "Hospital_total" = "Total...7" ) %>%
-  filter(!is.na(ICU_total)) %>%
+  #filter(!is.na(ICU_total)) %>%
   #mutate(date = as.Date(as.numeric(date), origin = "1899-12-30")) %>%
   mutate(date = lubridate::ymd(date)) %>%
-  mutate(ICU_confsusp = case_when(is.na(ICU_confirmed) & is.na(ICU_suspected) ~ ICU_total)) %>%
-  mutate(Hospital_confsusp = case_when(is.na(Hospital_confirmed) & is.na(Hospital_suspected) ~ Hospital_total)) %>%
+  mutate(date = case_when(date == ymd("2020-06-05") & Hospital_total == 1019 ~ ymd("2020-06-06"),
+                          TRUE ~ ymd(date))) %>%
+  #mutate(ICU_confsusp = case_when(is.na(ICU_confirmed) & is.na(ICU_suspected) ~ ICU_total)) %>%
+  #mutate(Hospital_confsusp = case_when(is.na(Hospital_confirmed) & is.na(Hospital_suspected) ~ Hospital_total)) %>%
   select(date, contains("ICU"), everything())
 
 data_hosp_icu <- data_hosp %>%
-  select(date, contains("ICU")) %>%
-  pivot_longer(cols = c(ICU_confirmed, ICU_suspected, ICU_confsusp), names_to = "Patients", values_to = "Number") %>%
-  mutate(Patients = recode(Patients,  "ICU_confsusp" = "Confirmed/Suspected", 
-                           "ICU_confirmed" = "Confirmed", 
-                           "ICU_suspected" = "Suspected")) %>%
-  mutate(Patients = factor(Patients, levels = c("Confirmed/Suspected", "Confirmed", "Suspected")))
+  select(date, ICU_confirmed)
 
 data_hosp_hosp <- data_hosp %>%
-  select(date, contains("hospital")) %>%
-  pivot_longer(cols = c(Hospital_confirmed, Hospital_suspected, Hospital_confsusp), names_to = "Patients", values_to = "Number") %>%
-  mutate(Patients = recode(Patients,  "Hospital_confsusp" = "Confirmed/Suspected", 
-                           "Hospital_confirmed" = "Confirmed", 
-                           "Hospital_suspected" = "Suspected")) %>%
-  mutate(Patients = factor(Patients, levels = c("Confirmed/Suspected", "Confirmed", "Suspected")))
+  select(date, Hospital_confirmed)
+# data_hosp_icu <- data_hosp %>%
+#   select(date, contains("ICU")) %>%
+#   pivot_longer(cols = c(ICU_confirmed, ICU_suspected, ICU_confsusp), names_to = "Patients", values_to = "Number") %>%
+#   mutate(Patients = recode(Patients,  "ICU_confsusp" = "Confirmed/Suspected", 
+#                            "ICU_confirmed" = "Confirmed", 
+#                            "ICU_suspected" = "Suspected")) %>%
+#   mutate(Patients = factor(Patients, levels = c("Confirmed/Suspected", "Confirmed", "Suspected")))
+# 
+# data_hosp_hosp <- data_hosp %>%
+#   select(date, contains("hospital")) %>%
+#   pivot_longer(cols = c(Hospital_confirmed, Hospital_suspected, Hospital_confsusp), names_to = "Patients", values_to = "Number") %>%
+#   mutate(Patients = recode(Patients,  "Hospital_confsusp" = "Confirmed/Suspected", 
+#                            "Hospital_confirmed" = "Confirmed", 
+#                            "Hospital_suspected" = "Suspected")) %>%
+#   mutate(Patients = factor(Patients, levels = c("Confirmed/Suspected", "Confirmed", "Suspected")))
 
 
 
@@ -349,11 +397,12 @@ save(cases_by_area,cov_globaldata,cov_offset, cov_trajplot, cov_ukdata,
      covid_deaths_2020, dat_uk, dat_uk_total, dat_world, data_hosp_hosp, 
      data_hosp_icu, last_week, nrs_week, nrs_deaths_covid_week_location,
      ref, 
+     data_testing_long,
      scot_cases, scot_data, scot_data_all, scot_data_health_board, scot_data_health_board_total,
      scot_data_raw, scot_deaths, scot_pop,  scot_tests, scot_tests_long, uk_scot_data, 
      scot_agesex, covid_deaths_2020_pop, nrs_deaths_comparison,
      nrs_deaths_covid_hb, nrs_deaths_healthboards_total,
-     nrs_deaths_hb_location,
+     nrs_deaths_hb_location,scot_tests_perc,
      file = "/Users/smazeri/Dropbox/Scot_Covid19/app_all.RData")
 #rm(list = ls())
 #load("app_all.RData")

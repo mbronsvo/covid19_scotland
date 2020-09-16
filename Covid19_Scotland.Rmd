@@ -63,7 +63,7 @@ plot_ly(data = scot_data, x = ~date, y = ~new_cases, text = ~new_cases, color = 
 ### Cumulative confirmed cases 
 ```{r}
 renderPlotly({
-plot_ly(data = scot_data, x = ~date, y = ~confirmed_cases, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
+plot_ly(data = scot_data, x = ~date, y = ~confirmed_cases, color = ~I("#297fe1"), type = "scatter", mode = "lines", 
                hovertemplate = paste('Date: %{x}',
                         '<br>Total cases: %{y}<extra></extra>')) %>%
 plotly::config(displayModeBar = FALSE)  %>%
@@ -84,10 +84,11 @@ Row {data-height=485}
 ### Daily tests conducted
 ```{r}
 renderPlotly({
-plot_ly(data = scot_tests_long, x = ~date, y = ~Number, text = ~Conducted, color = ~Result, type = "bar", colors = c("#b24b29", "#297fe1"), 
+plot_ly(data = data_testing_long, x = ~date, y = ~Number, text = ~`Daily NHS_RTC`, color = ~Result, type = "bar", colors = c("#297fe1", "#E69F00"),
+#colors = c("#b24b29", "#297fe1"),
                hovertemplate = paste('Date: %{x}',
-                        '<br>Result P/N: %{y}',
-                        '<br>Total test: %{text}<extra></extra>')) %>%
+                        '<br>Number: %{y}',
+                        '<br>Total tests: %{text}<extra></extra>')) %>%
   plotly::config(displayModeBar = FALSE)  %>%
   layout(barmode = 'stack',
          xaxis = list(
@@ -97,14 +98,29 @@ plot_ly(data = scot_tests_long, x = ~date, y = ~Number, text = ~Conducted, color
         title = ""), 
         yaxis = list(title = "",
                      tickformat = "digit"),
-        legend = list(x = 0.1, y = 0.9)) 
+        legend = list(x = 0.05, y = 0.9))   
+  
+# plot_ly(data = scot_tests_long, x = ~date, y = ~Number, text = ~Conducted, color = ~Result, type = "bar", colors = c("#b24b29", "#297fe1"), 
+#                hovertemplate = paste('Date: %{x}',
+#                         '<br>Result P/N: %{y}',
+#                         '<br>Total test: %{text}<extra></extra>')) %>%
+#   plotly::config(displayModeBar = FALSE)  %>%
+#   layout(barmode = 'stack',
+#          xaxis = list(
+#         type = 'date',
+#         tickformat = "%d %b", 
+#         #showgrid = F,
+#         title = ""), 
+#         yaxis = list(title = "",
+#                      tickformat = "digit"),
+#         legend = list(x = 0.1, y = 0.9)) 
 })
 ```
 
-### Confirmed cases per test conducted\*
+<!---### Cumulative confirmed cases per test conducted\*
 ```{r}
 renderPlotly({
-plot_ly(data = scot_tests, x = ~date, y = ~cases_per_test, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
+plot_ly(data = scot_tests, x = ~date, y = ~cases_per_test, color = ~I("#297fe1"), type = "scatter", mode = "lines", 
                hovertemplate = paste('Date: %{x}',
                         '<br>Cases per test: %{y:.2f}<extra></extra>')) %>%
   plotly::config(displayModeBar = FALSE)  %>%
@@ -117,6 +133,45 @@ plot_ly(data = scot_tests, x = ~date, y = ~cases_per_test, color = ~I("#297fe1")
         showlegend = FALSE) 
 })  
 ```
+--->
+
+### Daily % of people testing positive out of total number of people tested
+```{r}
+renderPlotly({
+fig <- scot_tests_perc %>%
+  select(positive_perc, date) %>%
+  mutate(rolling_av = zoo::rollmean(positive_perc, k = 7, align = "right", fill = NA)) %>%
+  mutate(rolling_sum = roll_sumr(positive_perc, n = 7)) %>% 
+  plot_ly(data = ., x = ~date, y = ~positive_perc, type = "bar", color = I("#297fe1"),
+          name = "Daily")
+
+fig <- add_trace(fig,
+          x = ~date,
+          y = ~rolling_av,
+          type='scatter',
+          mode='lines',
+          line = list(color = 'black'),
+          name = "7 day rolling average"
+     )
+
+fig %>%
+  plotly::config(displayModeBar = FALSE)  %>%
+  layout(legend = list(x = 0.6, y = 0.9),
+         hovermode = "x unified",
+         xaxis = list(
+            type = 'date',
+            tickformat = "%d %b", 
+            #showgrid = F,
+            title = ""),
+         yaxis = list(title = "")) %>%
+     partial_bundle()
+}) 
+```
+
+
+Row  {data-height=100}
+-----------------------------------------------------------------------
+<font size="2" color="#ff0000">Please note that the daily number of new positive cases up until 14/06/2020 are based on tests carried out through NHS Scotland labs only. From 15/06/2020 people tested through the UK Government (UKG) testing programme (Regional Testing Centres, Mobile Testing Units and home testing kits) testing programme are also included. Previous data have not been changed to account for the UKG data so the total of the daily numbers is 2,275 fewer than the cumulative total. Please note that the **increase in the cumulative figures** on 15 June is due to the addition of the backlog of UKG cases to the database. [More info..](https://www.gov.scot/publications/coronavirus-covid-19-trends-in-daily-data/)</font>
 
 Hospital data {data-navmenu="Scotland"}
 =======================================================================
@@ -127,12 +182,29 @@ Row
 ### Number of Covid-19 patients in hospital as of `r format(max(data_hosp_hosp$date), '%d %B %Y')`
 ```{r}
 renderPlotly({
-  plot_ly(data = data_hosp_hosp, x = ~date, y = ~Number, text = ~Hospital_total, 
-        color = ~Patients, type = "bar", #colors = c("#b24b29", "#297fe1", "#009E73"), 
-        colors = viridis(3, option = "D")[c(2,1,3)],
+  # plot_ly(data = data_hosp_hosp, x = ~date, y = ~Number, text = ~Hospital_total, 
+  #       color = ~Patients, type = "bar", #colors = c("#b24b29", "#297fe1", "#009E73"), 
+  #       colors = viridis(3, option = "D")[c(2,1,3)],
+  #       hovertemplate = paste('Date: %{x}',
+  #                             '<br>Number: %{y}',
+  #                             '<br>Total: %{text}<extra></extra>')) %>%
+  # plotly::config(displayModeBar = FALSE)  %>%
+  # layout(barmode = 'stack',
+  #        xaxis = list(
+  #          type = 'date',
+  #          tickformat = "%d %b", 
+  #          #showgrid = F,
+  #          title = ""), 
+  #        yaxis = list(title = "",
+  #                     tickformat = "digit"),
+  #         legend = list(x = 0.02, y = 0.9)
+  #        ) %>%
+  #   partial_bundle()
+  
+  plot_ly(data = data_hosp_hosp, x = ~date, y = ~Hospital_confirmed, text = ~Hospital_confirmed, 
+        color = I("#440154FF"), type = "bar", 
         hovertemplate = paste('Date: %{x}',
-                              '<br>Number: %{y}',
-                              '<br>Total: %{text}<extra></extra>')) %>%
+                              '<br>Hospital confirmed: %{y}<extra></extra>')) %>%
   plotly::config(displayModeBar = FALSE)  %>%
   layout(barmode = 'stack',
          xaxis = list(
@@ -141,8 +213,7 @@ renderPlotly({
            #showgrid = F,
            title = ""), 
          yaxis = list(title = "",
-                      tickformat = "digit"),
-          legend = list(x = 0.02, y = 0.9)
+                      tickformat = "digit")
          ) %>%
     partial_bundle()
 })
@@ -153,13 +224,31 @@ renderPlotly({
 ```{r}
 renderPlotly({
  
-plot_ly(data = data_hosp_icu, x = ~date, y = ~Number, text = ~ICU_total, 
-        color = ~Patients, type = "bar", #colors = c("#b24b29", "#297fe1", "#009E73"), 
-        colors = viridis(3, option = "D")[c(2,1,3)],
+# plot_ly(data = data_hosp_icu, x = ~date, y = ~Number, text = ~ICU_total, 
+#         color = ~Patients, type = "bar", #colors = c("#b24b29", "#297fe1", "#009E73"), 
+#         colors = viridis(3, option = "D")[c(2,1,3)],
+#         hovertemplate = paste('Date: %{x}',
+#                               '<br>Number: %{y}',
+#                               '<br>Total: %{text}<extra></extra>'),
+#         showlegend = F) %>%
+#   plotly::config(displayModeBar = FALSE)  %>%
+#   layout(barmode = 'stack',
+#          xaxis = list(
+#            type = 'date',
+#            tickformat = "%d %b", 
+#            #showgrid = F,
+#            title = ""), 
+#          yaxis = list(title = "",
+#                       tickformat = "digit"),
+#          #showlegend = FALSE
+#          legend = list(x = 0.1, y = 0.9)
+#          ) %>%
+#     partial_bundle()
+  
+plot_ly(data = data_hosp_icu, x = ~date, y = ~ICU_confirmed, text = ~ICU_confirmed, 
+        color = I("#21908CFF"), type = "bar", 
         hovertemplate = paste('Date: %{x}',
-                              '<br>Number: %{y}',
-                              '<br>Total: %{text}<extra></extra>'),
-        showlegend = F) %>%
+                              '<br>ICU confirmed: %{y}<extra></extra>')) %>%
   plotly::config(displayModeBar = FALSE)  %>%
   layout(barmode = 'stack',
          xaxis = list(
@@ -168,9 +257,7 @@ plot_ly(data = data_hosp_icu, x = ~date, y = ~Number, text = ~ICU_total,
            #showgrid = F,
            title = ""), 
          yaxis = list(title = "",
-                      tickformat = "digit"),
-         #showlegend = FALSE
-         legend = list(x = 0.1, y = 0.9)
+                      tickformat = "digit")
          ) %>%
     partial_bundle()
 })
@@ -178,6 +265,7 @@ plot_ly(data = data_hosp_icu, x = ~date, y = ~Number, text = ~ICU_total,
 
 Cases and Maps {data-navmenu="Health Boards"}
 =======================================================================
+
 Row {data-height=485}
 -------------------------------------
 
@@ -217,13 +305,13 @@ ts <- scot_data_raw %>%
 line_2 <- tibble( days = seq(0, max(ts$days)-18)) %>% 
   mutate(cases = c(ref, ref * exp(log(2) / 2) ^ (1:(n()-1))))
 
-line_3 <- tibble( days = seq(0, max(ts$days)-50)) %>% 
+line_3 <- tibble( days = seq(0, max(ts$days)-95)) %>% 
   mutate(cases = c(ref, ref * 1.260 ^ (1:(n()-1))))
 
-line_7 <- tibble( days = seq(0, max(ts$days))) %>% 
+line_7 <- tibble( days = seq(0, max(ts$days)-45)) %>% 
   mutate(cases = c(ref, ref * 1.104 ^ (1:(n()-1))))
 
-line_14 <- tibble( days = seq(0, max(ts$days))) %>% 
+line_14 <- tibble( days = seq(0, max(ts$days)-10)) %>% 
   mutate(cases = c(ref, ref * exp(log(2) / 14) ^ (1:(n()-1))))
 
 p<- ts %>% 
@@ -233,7 +321,7 @@ p<- ts %>%
   ggplot() +
   aes(x = days, cases, colour = health_board) +
   geom_line(lwd = 0.75, alpha = 0.75) +
-  geom_point(size = 1) +
+  geom_point(size = 0.5) +
   #geom_label_repel(aes(label = label),
   #                 nudge_x = 1,
   #                 na.rm = TRUE,
@@ -273,7 +361,6 @@ w %>%
 
 })
 ```
-
 
 
 ### Confirmed cases/deaths and rates per 10,000 of population by Health Board in Scotland
@@ -322,12 +409,17 @@ addLayersControl(
 })
 ```
 
+Row  {data-height=50}
+-----------------------------------------------------------------------
+
+<font size="2" color="#ff0000"> Please note that as of 15 June, cumulative cases includes people tested through the UK Government (UKG) testing programme (Regional Testing Centres, Mobile Testing Units and home testing kits). Prior to 15 June the figures show people tested through NHS labs only. The increase on 15 June is due to the addition of all the UKG cases to the database. [More info..](https://www.gov.scot/publications/coronavirus-covid-19-trends-in-daily-data/)</font>
+
 Cases Trajectories {data-navmenu="Health Boards"}
 =======================================================================
 
 Row 
 -------------------------------------
-### <strong>Trajectories of COVID-19.</strong></br>This is a plot of new cases against total cases on a log-log scale to emphasise the exponential trajectiories of outbreaks in each Health Board and highlight when these begin to slow down. 
+### <strong>Trajectories of COVID-19.</strong></br>This is a plot of new cases against total cases on a log-log scale to emphasise the exponential trajectiories of outbreaks in each Health Board and highlight when these begin to slow down. Please note that as of 15 June, cumulative cases includes people tested through the UK Government (UKG) testing programme (Regional Testing Centres, Mobile Testing Units and home testing kits). Prior to 15 June the figures show people tested through NHS labs only. <strong>The increase on 15 June</strong> (black circlet) is due to the addition of all the UKG cases to the database. [More info..](https://www.gov.scot/publications/coronavirus-covid-19-trends-in-daily-data/).
 
 ```{r}
 server <- function(input, output) {
@@ -385,6 +477,7 @@ server <- function(input, output) {
     geom_line(col= "grey93") +
     geom_line(data = df_hi, lwd = 1.5, aes(colour = {{group}})) +
     geom_point(data = df_hi, aes(colour = {{group}})) +
+    geom_point(data = filter(df_hi, date == ymd("2020-06-15")), aes(x = outcome, y = change), size = 10, shape = 1) +
     scale_x_continuous(trans = "log10",
                        labels = scales::comma_format(accuracy = 1),
                        breaks = breaks,
@@ -509,7 +602,7 @@ plot_ly(data = nrs_deaths_covid_hb %>% filter(week_beginning > dmy("1/3/2020")),
          yaxis = list(title = "",
                      range=c(0,NA),
                      tickformat = "digit"),
-         legend = list(x = 0.02, y = 0.9)
+         legend = list(x = 0.65, y = 0.9)
   ) %>%
   partial_bundle()
 })
@@ -706,7 +799,7 @@ w %>%
 })
 ```
 
-### Deaths per confirmed cases\*
+### Total deaths per cumulative confirmed cases\*
 ```{r}
 renderPlotly({
 plot_ly(data = scot_tests, x = ~date, y = ~deaths_per_case, color = ~I("#297fe1"), type = "scatter", mode = "lines+markers", 
@@ -954,7 +1047,7 @@ a <- list(
 })
 ```
 
-Scotland / UK 
+<!-- Scotland / UK 
 =======================================================================
 Row
 -------------------------------------
@@ -1058,7 +1151,7 @@ plot_ly(x = ~date, y = ~deaths, text = ~country_region, color = ~country_region,
     partial_bundle()
 })
 ```
-
+-->
 
 Global trajectories {data-navmenu="Global"} 
 =======================================================================
